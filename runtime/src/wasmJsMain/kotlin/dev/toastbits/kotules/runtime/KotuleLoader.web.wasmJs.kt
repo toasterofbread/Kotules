@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.runtime
 
-import dev.toastbits.kotules.extension.JsType
+import dev.toastbits.kotules.extension.type.JsType
 
 internal actual fun <T: JsType> newKotule(cls: JsAny): T = js("new cls()")
 

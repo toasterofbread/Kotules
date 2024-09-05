@@ -13,6 +13,7 @@ vanniktech-publish = "0.29.0"
 ktor = "3.0.0-beta-2"
 androidx-activity-compose = "1.9.1"
 kotlinx-coroutines = "1.9.0-RC"
+ksp = "2.0.20-1.0.24"
 
 mokkery = "2.3.0"
 assertk = "0.28.1"
@@ -36,3 +37,4 @@ kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktech-publish" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-application = { id = "com.android.application", version.ref = "agp" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

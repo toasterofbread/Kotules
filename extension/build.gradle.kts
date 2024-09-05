@@ -11,6 +11,14 @@ plugins {
 
 kotlin {
     configureAllKmpTargets()
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.core)
+            }
+        }
+    }
 }
 
 val projectName: String = libs.versions.project.name.get()

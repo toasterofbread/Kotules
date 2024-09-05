@@ -1,6 +1,6 @@
 # Kotules (WIP)
 
-## Run sample
+## Running the sample
 
 ### WasmJS & JS
 

@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.runtime
 
-import dev.toastbits.kotules.extension.JsType
+import dev.toastbits.kotules.extension.type.JsType
 
 private external fun eval(code: String)
 

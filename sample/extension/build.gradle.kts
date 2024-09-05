@@ -19,6 +19,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(projects.extension)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.ktor.core)
             }
         }
     }
