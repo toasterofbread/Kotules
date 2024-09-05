@@ -1,13 +1,11 @@
 package dev.toastbits.kotules.extension
 
-import dev.toastbits.kotules.extension.type.JsType
-import kotlinx.coroutines.CoroutineScope
+import dev.toastbits.kotules.extension.type.ValueType
 
-@Suppress("EXPECTED_EXTERNAL_DECLARATION")
-expect external class KotulePromise<T: JsType?>
+expect class KotulePromise<T: ValueType?>
 
 expect class OutKotulePromise
 
-expect inline fun <reified T> kotulePromise(noinline getResult: suspend CoroutineScope.() -> T): OutKotulePromise
+expect inline fun <reified T> kotulePromise(noinline getResult: suspend () -> T): OutKotulePromise
 
-expect suspend fun <T: JsType?> KotulePromise<T>.await(): T
+expect suspend fun <T: ValueType?> KotulePromise<T>.await(): T

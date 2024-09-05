@@ -40,7 +40,7 @@ kotlin {
 compose {
     desktop {
         application {
-            mainClass = "dev.toastbits.$projectName.application.MainKt"
+            mainClass = "dev.toastbits.$projectName.sample.app.MainKt"
         }
     }
 

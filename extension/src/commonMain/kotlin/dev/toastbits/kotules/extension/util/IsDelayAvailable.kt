@@ -1,5 +1,5 @@
 package dev.toastbits.kotules.extension.util
 
-import kotlinx.coroutines.CoroutineScope
+import kotlin.coroutines.CoroutineContext
 
-expect fun CoroutineScope.isDelayAvailable(): Boolean
+expect fun CoroutineContext.isDelayAvailable(): Boolean

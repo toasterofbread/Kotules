@@ -1,3 +1,3 @@
 package dev.toastbits.kotules.extension.type
 
-actual typealias JsType = JsAny
+actual external interface ValueType

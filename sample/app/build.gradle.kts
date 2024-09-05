@@ -24,6 +24,18 @@ kotlin {
                 implementation(libs.ktor.core)
             }
         }
+
+        val jvmMain by getting {
+            dependencies {
+                runtimeOnly(libs.ktor.client.cio)
+            }
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.named("run") {
+        dependsOn(":sample:extension:jvmJar")
     }
 }
 

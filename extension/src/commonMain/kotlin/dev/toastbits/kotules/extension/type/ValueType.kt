@@ -1,12 +1,11 @@
 package dev.toastbits.kotules.extension.type
 
-@Suppress("EXPECTED_EXTERNAL_DECLARATION")
-expect external interface JsType
+expect interface ValueType
 
 inline fun <reified T> checkKotulePromiseType() {
     when (T::class) {
         OutJsInt::class,
-        OutJsString::class -> return
+        OutStringValue::class -> return
     }
 
     throw IllegalArgumentException("Invalid type for KotulePromise ${T::class}")

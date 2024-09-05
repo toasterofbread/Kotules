@@ -1,10 +1,10 @@
 package dev.toastbits.kotules.runtime
 
-import dev.toastbits.kotules.extension.type.JsType
+import dev.toastbits.kotules.extension.type.ValueType
 
-internal actual fun <T: JsType> newKotule(cls: JsType): T = js("new cls()").unsafeCast<T>()
+internal actual fun <T: ValueType> newKotule(cls: ValueType): T = js("new cls()").unsafeCast<T>()
 
-internal actual fun getExtension(): JsType = js("extension").unsafeCast<JsType>()
+internal actual fun getExtension(): ValueType = js("extension").unsafeCast<ValueType>()
 
 private val getObjectEntries: (dynamic) -> Array<Array<dynamic>> =
     js("Object.entries") as (dynamic) -> Array<Array<dynamic>>

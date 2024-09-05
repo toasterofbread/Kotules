@@ -1,14 +1,14 @@
 package dev.toastbits.kotules.extension.util
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
 
 @OptIn(InternalCoroutinesApi::class)
-actual fun CoroutineScope.isDelayAvailable(): Boolean {
-    if (coroutineContext[ContinuationInterceptor] is Delay) {
+actual fun CoroutineContext.isDelayAvailable(): Boolean {
+    if (get(ContinuationInterceptor) is Delay) {
         return true
     }
 

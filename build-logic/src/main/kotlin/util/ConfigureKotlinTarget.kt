@@ -105,7 +105,7 @@ fun KotlinMultiplatformExtension.configureKmpTargets(
         }
 
         common {
-            group("notWasmJs") {
+            group("notWeb") {
                 group("allJvm") {
                     ifPresent(KmpTarget.JVM)
                     ifPresent(KmpTarget.ANDROID)

@@ -17,6 +17,12 @@ kotlin {
                 api(projects.extension)
             }
         }
+
+        val jvmMain by getting {
+            dependencies {
+                implementation(kotlin("reflect"))
+            }
+        }
     }
 }
 

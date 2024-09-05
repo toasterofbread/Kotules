@@ -2,7 +2,7 @@ package dev.toastbits.kotules.extension.type
 
 import dev.toastbits.kotules.extension.PlatformJsExport
 
-external class JsInt: JsType {
+expect class IntValue: ValueType {
     val value: Int
 }
 
