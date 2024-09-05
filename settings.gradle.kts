@@ -21,6 +21,7 @@ dependencyResolutionManagement {
 rootProject.name = "Kotules"
 include(":runtime")
 include(":extension")
+include(":binder")
 
 include(":sample:app")
 include(":sample:extension")

@@ -1,12 +1,12 @@
 package dev.toastbits.kotules.sample.app
 
 import dev.toastbits.kotules.runtime.KotuleLoader
-import dev.toastbits.kotules.sample.extension.SampleKotule
+import dev.toastbits.kotules.sample.extension.SampleKotule_InputBinding
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 
-actual suspend fun loadSampleKotule(): SampleKotule {
+actual suspend fun loadSampleKotule(): SampleKotule_InputBinding {
     val extensionFileUrl: String = getUrl() + "/" + SampleConfig.JS_EXTENSION_FILE
     println("Loading extension file at $extensionFileUrl")
 

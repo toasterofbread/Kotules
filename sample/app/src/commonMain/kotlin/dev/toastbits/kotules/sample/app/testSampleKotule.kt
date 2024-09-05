@@ -3,11 +3,11 @@ package dev.toastbits.kotules.sample.app
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.type.StringValue
-import dev.toastbits.kotules.sample.extension.SampleKotule
+import dev.toastbits.kotules.sample.extension.SampleKotule_InputBinding
 import kotlinx.coroutines.delay
 
 suspend fun testSampleKotule() {
-    val kotule: SampleKotule = loadSampleKotule()
+    val kotule: SampleKotule_InputBinding = loadSampleKotule()
     println("Loaded SampleKotule: $kotule")
 
     println("Calling repeatInput(\"Hello \", 5) on SampleKotule")

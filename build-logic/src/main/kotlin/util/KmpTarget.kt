@@ -9,5 +9,7 @@ enum class KmpTarget {
 
     companion object {
         val ALL_COMPOSE: Array<KmpTarget> = arrayOf(JVM, ANDROID, WASMJS, JS)
+
+        val SUPPORTED: Array<KmpTarget> = arrayOf(JVM, WASMJS, JS)
     }
 }

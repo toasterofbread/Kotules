@@ -1,8 +1,9 @@
-import util.configureAllKmpTargets
+import util.KmpTarget
+import util.configureKmpTargets
 
 plugins {
+//    id("android-library-conventions")
     id("kmp-conventions")
-    id("android-library-conventions")
     id("publishing-conventions")
 
     alias(libs.plugins.kotlin)
@@ -10,7 +11,7 @@ plugins {
 }
 
 kotlin {
-    configureAllKmpTargets()
+    configureKmpTargets(*KmpTarget.SUPPORTED)
 
     sourceSets {
         val commonMain by getting {

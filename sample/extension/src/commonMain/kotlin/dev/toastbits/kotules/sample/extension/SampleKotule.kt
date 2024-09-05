@@ -1,11 +1,6 @@
 package dev.toastbits.kotules.sample.extension
 
-import dev.toastbits.kotules.extension.KotulePromise
-import dev.toastbits.kotules.extension.OutKotulePromise
-import dev.toastbits.kotules.extension.PlatformJsExport
-import dev.toastbits.kotules.extension.kotulePromise
-import dev.toastbits.kotules.extension.type.StringValue
-import dev.toastbits.kotules.extension.type.OutStringValue
+import dev.toastbits.kotules.extension.annotation.KotuleAnnotation
 import dev.toastbits.kotules.extension.util.isDelayAvailable
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -13,12 +8,14 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.delay
 import kotlin.coroutines.coroutineContext
 
-@PlatformJsExport
-class SampleKotuleImpl {
+@KotuleAnnotation
+class SampleKotule {
+    val coolProperty: Int = 56
+
     fun repeatInput(input: String, repeatCount: Int): String =
         input.repeat(repeatCount)
 
-    fun downloadFortune(): OutKotulePromise = kotulePromise {
+    suspend fun downloadFortune(): String {
         println("downloadFortune: Starting")
 
         if (!coroutineContext.isDelayAvailable()) {
@@ -35,11 +32,6 @@ class SampleKotuleImpl {
         val fortuneText: String = HttpClient().get("https://helloacm.com/api/fortune/").bodyAsText()
 
         println("downloadFortune: Returning result")
-        return@kotulePromise OutStringValue(fortuneText)
+        return fortuneText
     }
-}
-
-expect interface SampleKotule {
-    fun repeatInput(input: String, repeatCount: Int): String
-    fun downloadFortune(): KotulePromise<StringValue>
 }
