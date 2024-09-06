@@ -35,7 +35,8 @@ internal class KotuleBindingInterfaceGenerator: KotuleTypeGenerator {
                 if (target == KmpTarget.COMMON) KModifier.EXPECT
                 else KModifier.ACTUAL
 
-            addModifiers(expectationModifier)
+            addModifiers(expectationModifier, KModifier.INTERNAL)
+
             if (target.isWeb()) {
                 addModifiers(KModifier.EXTERNAL)
             }

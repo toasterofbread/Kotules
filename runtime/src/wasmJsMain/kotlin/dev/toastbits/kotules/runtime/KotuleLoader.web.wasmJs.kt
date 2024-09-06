@@ -2,7 +2,7 @@ package dev.toastbits.kotules.runtime
 
 import dev.toastbits.kotules.extension.type.ValueType
 
-internal actual fun <T: ValueType> newKotule(cls: JsAny): T = js("new cls()")
+internal actual fun <T: ValueType> new(constructor: JsAny): T = js("new constructor()")
 
 internal actual fun getExtension(): JsAny = js("extension")
 

@@ -22,6 +22,8 @@ internal class KotuleLoaderGenerator(
     ): TypeSpec =
         TypeSpec.objectBuilder(KotuleRuntimeBinderConstants.getLoaderName(kotuleInterface))
             .apply {
+                addModifiers(KModifier.INTERNAL)
+
                 if (target == KmpTarget.COMMON) {
                     addModifiers(KModifier.EXPECT)
                 }

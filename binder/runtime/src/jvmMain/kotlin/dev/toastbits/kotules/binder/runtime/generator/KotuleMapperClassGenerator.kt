@@ -37,6 +37,8 @@ internal class KotuleMapperClassGenerator(
         else TypeSpec.classBuilder(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface)).apply {
             val inputClassName: ClassName = ClassName(packageName, KotuleRuntimeBinderConstants.getInputBindingName(kotuleInterface))
 
+            addModifiers(KModifier.INTERNAL)
+
             primaryConstructor(
                 FunSpec.constructorBuilder()
                     .addParameter(instanceName, inputClassName)

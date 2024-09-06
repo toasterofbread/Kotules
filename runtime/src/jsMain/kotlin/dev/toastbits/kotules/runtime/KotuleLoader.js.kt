@@ -2,7 +2,7 @@ package dev.toastbits.kotules.runtime
 
 import dev.toastbits.kotules.extension.type.ValueType
 
-internal actual fun <T: ValueType> newKotule(cls: ValueType): T = js("new cls()").unsafeCast<T>()
+internal actual fun <T: ValueType> new(constructor: ValueType): T = js("new constructor()").unsafeCast<T>()
 
 internal actual fun getExtension(): ValueType = js("extension").unsafeCast<ValueType>()
 

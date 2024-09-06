@@ -6,4 +6,4 @@ package dev.toastbits.kotules.extension
     AnnotationTarget.FUNCTION,
     AnnotationTarget.FILE
 )
-expect annotation class PlatformJsExport()
+expect annotation class PlatformJsName(val name: String)

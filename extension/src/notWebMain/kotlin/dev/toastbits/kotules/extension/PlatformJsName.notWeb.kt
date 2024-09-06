@@ -6,4 +6,4 @@ package dev.toastbits.kotules.extension
     AnnotationTarget.FUNCTION,
     AnnotationTarget.FILE
 )
-expect annotation class PlatformJsExport()
+actual annotation class PlatformJsName actual constructor(actual val name: String)

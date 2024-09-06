@@ -8,8 +8,10 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.delay
 import kotlin.coroutines.coroutineContext
+import kotlin.js.JsExport
 
 @KotuleImplementationAnnotation(bindInterface = SampleKotule::class)
+@Suppress("JS_NAME_CLASH") // TODO
 class SampleKotuleImpl: SampleKotule {
     override val coolProperty: Int = 56
 
@@ -23,7 +25,7 @@ class SampleKotuleImpl: SampleKotule {
             println("downloadFortune: Delay is unavailable in current coroutine scope, skipping test")
         }
         else {
-            val delayCount: Int = 3
+            val delayCount: Int = 5
             for (i in 0 until delayCount) {
                 println("downloadFortune: Delaying by 1 second (${i + 1} of $delayCount)")
                 delay(1000)

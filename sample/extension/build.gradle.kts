@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import util.configureAllComposeTargets
+import util.libCatalog
+import util.version
 
 plugins {
     id("android-library-conventions")
@@ -22,8 +23,10 @@ kotlin {
             dependencies {
                 implementation(projects.sample.app)
                 implementation(projects.extension)
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.ktor.core)
+
+                // https://github.com/Kotlin/kotlinx.coroutines/issues/3874#issuecomment-2130428084
+                implementation(devNpm("string-replace-loader", libCatalog.version("npm.string_replace_loader")))
             }
 
             kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/commonMain")
@@ -56,8 +59,8 @@ dependencies {
     add("kspCommonMainMetadata", projects.binder.extension)
 }
 
-project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
-    if (name != "kspCommonMainKotlinMetadata") {
-        dependsOn("kspCommonMainKotlinMetadata")
-    }
-}
+//project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
+//    if (name != "kspCommonMainKotlinMetadata") {
+//        dependsOn("kspCommonMainKotlinMetadata")
+//    }
+//}

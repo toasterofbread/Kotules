@@ -13,4 +13,5 @@ object KotuleRuntimeBinderConstants {
         kotuleInterface.simpleName.asString() + "_Loader"
 
     const val MAPPER_INSTANCE_NAME: String = "_instance"
+    const val LOADER_INSTANCE_EXTENSION_FUNCTION_NAME: String = "getLoader"
 }

@@ -1,4 +1,4 @@
-import util.libs
+import util.libCatalog
 import util.version
 
 plugins {
@@ -8,7 +8,7 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val projectName: String = libs.version("project.name")
+val projectName: String = libCatalog.version("project.name")
 
 kotlin {
     sourceSets {

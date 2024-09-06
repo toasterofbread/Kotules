@@ -60,9 +60,10 @@ internal class KotuleExtensionAnnotationProcessor(
             fileSpecBuilder.addImport(split.dropLast(1).joinToString("."), split.last())
         }
 
-        val classGenerator: KotuleTypeGenerator = KotuleBindingClassGenerator(
-            addImport = addImport
-        )
+        val classGenerator: KotuleTypeGenerator =
+            KotuleBindingClassGenerator(
+                addImport = addImport
+            )
 
         fun KmpTarget.generateFile(): FileSpec? {
             fileSpecBuilder = FileSpec.builder(packageName, bindingClassName)

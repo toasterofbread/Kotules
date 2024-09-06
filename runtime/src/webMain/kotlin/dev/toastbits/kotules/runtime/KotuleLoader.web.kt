@@ -14,12 +14,12 @@ fun <T: KotuleInputBinding> loadKotuleInputBindingFromKotlinJsCode(jsCode: Strin
 
     val extension: ValueType = getExtension()
     val moduleConstructor: ValueType = extension.dot(implementationClass)
-    val moduleInstance: T = newKotule(moduleConstructor)
+    val moduleInstance: T = new(moduleConstructor)
 
     return moduleInstance
 }
 
-internal expect fun <T: ValueType> newKotule(cls: ValueType): T
+internal expect fun <T: ValueType> new(constructor: ValueType): T
 
 internal expect fun getExtension(): ValueType
 

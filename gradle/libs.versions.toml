@@ -12,9 +12,11 @@ agp = "8.3.2"
 vanniktech-publish = "0.29.0"
 ktor = "3.0.0-beta-2"
 androidx-activity-compose = "1.9.2"
-kotlinx-coroutines = "1.9.0-RC"
+kotlinx-coroutines = "1.9.0-RC.2"
 ksp = "2.0.20-1.0.24"
 poet = "1.18.1"
+
+npm-string_replace_loader = "3.1.0"
 
 mokkery = "2.3.0"
 assertk = "0.28.1"

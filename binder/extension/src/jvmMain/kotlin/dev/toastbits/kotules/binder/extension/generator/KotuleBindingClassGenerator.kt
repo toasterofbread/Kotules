@@ -8,6 +8,8 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
+import com.squareup.kotlinpoet.AnnotationSpec
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.PropertySpec
@@ -21,6 +23,7 @@ import dev.toastbits.kotules.extension.kotulePromise
 import dev.toastbits.kotules.binder.extension.mapper.getOutputWrapperClass
 import dev.toastbits.kotules.binder.extension.util.KmpTarget
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
+import dev.toastbits.kotules.extension.PlatformJsName
 import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 
@@ -40,16 +43,18 @@ internal class KotuleBindingClassGenerator(
             val instanceType: TypeName = kotuleClass.asType(emptyList()).toTypeName()
             addProperty(
                 PropertySpec.builder(instanceName, instanceType)
-                    .addModifiers(KModifier.PRIVATE)
+//                    .addModifiers(KModifier.PRIVATE)
                     .initializer("${kotuleClass.simpleName.asString()}()")
                     .build()
             )
 
             addAnnotation(PlatformJsExport::class)
 
-            if (target.isWeb()) {
-                addModifiers(KModifier.EXTERNAL)
-            }
+//            addAnnotation(
+//                AnnotationSpec.builder(PlatformJsName::class)
+//                    .addMember("\"${kotuleClass.simpleName.asString()}\"")
+//                    .build()
+//            )
 
             addProperties(kotuleClass.getDeclaredProperties())
             addFunctions(kotuleClass.getDeclaredFunctions())

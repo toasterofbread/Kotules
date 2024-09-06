@@ -7,19 +7,19 @@ import org.gradle.api.Project
 
 fun BaseExtension.configureAndroid(project: Project) {
     defaultConfig {
-        versionCode = project.libs.version("project.version.inc").toInt()
-        versionName = project.libs.version("project.version")
+        versionCode = project.libCatalog.version("project.version.inc").toInt()
+        versionName = project.libCatalog.version("project.version")
 
-        targetSdk = project.libs.version("android.sdk.target").toInt()
-        minSdk = project.libs.version("android.sdk.min").toInt()
+        targetSdk = project.libCatalog.version("android.sdk.target").toInt()
+        minSdk = project.libCatalog.version("android.sdk.min").toInt()
 
         if (this is ApplicationExtension) {
-            applicationId = "dev.toastbits." + project.libs.version("project.name")
+            applicationId = "dev.toastbits." + project.libCatalog.version("project.name")
         }
     }
 
     if (this is CommonExtension<*, *, *, *, *, *>) {
-        compileSdk = project.libs.version("android.sdk.compile").toInt()
+        compileSdk = project.libCatalog.version("android.sdk.compile").toInt()
     }
 
     namespace = project.getCurrentPackage()

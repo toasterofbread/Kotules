@@ -12,7 +12,12 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
+import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toClassName
@@ -21,12 +26,15 @@ import dev.toastbits.kotules.binder.runtime.generator.KotuleLoaderGenerator
 import dev.toastbits.kotules.binder.runtime.generator.KotuleMapperClassGenerator
 import dev.toastbits.kotules.binder.runtime.generator.KotuleTypeGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
+import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.getSourceSetName
 import dev.toastbits.kotules.extension.Kotule
+import dev.toastbits.kotules.runtime.KotuleLoader
 import dev.toastbits.kotules.runtime.annotation.KotuleAnnotation
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
+import kotlin.reflect.KClass
 
 internal class KotuleRuntimeAnnotationProcessor(
     environment: SymbolProcessorEnvironment
@@ -42,6 +50,7 @@ internal class KotuleRuntimeAnnotationProcessor(
         for (kotuleInterface in kotuleInterfaces) {
             validateKotuleClass(kotuleInterface)
             generateClassBindings(kotuleInterface)
+            generateLoaderInstanceExtension(kotuleInterface)
         }
 
         return emptyList()
@@ -119,19 +128,27 @@ internal class KotuleRuntimeAnnotationProcessor(
 
             for (target in targets) {
                 val fileSpec: FileSpec = target.generateFile() ?: continue
-
-                val outputPath: String = target.getSourceSetName() + "Main." + packageName
-                val file: OutputStream =
-                    codeGenerator.createNewFile(
-                        Dependencies(false),
-                        outputPath,
-                        fileSpec.name,
-                        extensionName = "${target.getSourceSetName()}.kt"
-                    )
-
-                OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)
+                writeFile(fileSpec, target, packageName)
             }
         }
+    }
+
+    private fun generateLoaderInstanceExtension(kotuleInterface: KSClassDeclaration) {
+        val packageName: String = kotuleInterface.packageName.asString()
+        val loaderType: ClassName = ClassName(packageName, KotuleRuntimeBinderConstants.getLoaderName(kotuleInterface))
+
+        val fileSpec =
+            FileSpec.builder(MemberName(packageName, KotuleRuntimeBinderConstants.LOADER_INSTANCE_EXTENSION_FUNCTION_NAME))
+                .addFunction(
+                    FunSpec.builder(KotuleRuntimeBinderConstants.LOADER_INSTANCE_EXTENSION_FUNCTION_NAME)
+                        .returns(KotuleLoader::class.asClassName().plusParameter(kotuleInterface.toClassName()))
+                        .receiver(KClass::class.asClassName().plusParameter(kotuleInterface.toClassName()))
+                        .addCode("return ${loaderType.simpleName}")
+                        .build()
+                )
+                .build()
+
+        writeFile(fileSpec, KmpTarget.COMMON, packageName)
     }
 
     private fun validateKotuleClass(kotuleInterface: KSClassDeclaration) {
@@ -155,6 +172,21 @@ internal class KotuleRuntimeAnnotationProcessor(
     private fun fail(message: String, node: KSNode): Nothing {
         logger.error(message, node)
         throw RuntimeException()
+    }
+
+    private fun writeFile(fileSpec: FileSpec, target: KmpTarget, packageName: String) {
+        val outputPath: String = target.getSourceSetName() + "Main." + packageName
+        val file: OutputStream =
+            codeGenerator.createNewFile(
+                Dependencies(false),
+                outputPath,
+                fileSpec.name,
+                extensionName =
+                if (target == KmpTarget.COMMON) "kt"
+                else "${target.getSourceSetName()}.kt"
+            )
+
+        OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)
     }
 }
 
