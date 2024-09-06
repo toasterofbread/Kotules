@@ -1,3 +1,5 @@
 package dev.toastbits.kotules.runtime
 
-expect object KotuleLoader
+import dev.toastbits.kotules.extension.Kotule
+
+expect interface KotuleLoader<T: Kotule>

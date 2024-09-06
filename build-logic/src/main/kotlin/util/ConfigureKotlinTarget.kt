@@ -1,10 +1,9 @@
-@file:OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class, ExternalKotlinTargetApi::class)
+@file:OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
 package util
 
 import org.gradle.kotlin.dsl.assign
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.ExternalKotlinTargetApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinDependencyHandler

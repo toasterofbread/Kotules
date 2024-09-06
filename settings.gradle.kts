@@ -19,9 +19,10 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Kotules"
-include(":runtime")
 include(":extension")
-include(":binder")
+include(":runtime")
+include(":binder:extension")
+include(":binder:runtime")
 
 include(":sample:app")
 include(":sample:extension")

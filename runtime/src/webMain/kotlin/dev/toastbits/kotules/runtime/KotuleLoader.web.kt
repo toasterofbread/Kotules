@@ -5,16 +5,18 @@ import dev.toastbits.kotules.extension.type.ValueType
 
 private external fun eval(code: String)
 
-actual object KotuleLoader {
-    fun <T: Kotule> loadFromKotlinJsCode(jsCode: String, implementationClass: String): T {
-        eval(jsCode)
+actual interface KotuleLoader<T: Kotule> {
+    fun loadFromKotlinJsCode(jsCode: String, implementationClass: String): T
+}
 
-        val extension: ValueType = getExtension()
-        val moduleConstructor: ValueType = extension.dot(implementationClass)
-        val moduleInstance: T = newKotule(moduleConstructor)
+fun <T: KotuleInputBinding> loadKotuleInputBindingFromKotlinJsCode(jsCode: String, implementationClass: String): T {
+    eval(jsCode)
 
-        return moduleInstance
-    }
+    val extension: ValueType = getExtension()
+    val moduleConstructor: ValueType = extension.dot(implementationClass)
+    val moduleInstance: T = newKotule(moduleConstructor)
+
+    return moduleInstance
 }
 
 internal expect fun <T: ValueType> newKotule(cls: ValueType): T

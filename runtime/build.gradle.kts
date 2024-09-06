@@ -21,7 +21,7 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
-                implementation(kotlin("reflect"))
+//                implementation(kotlin("reflect"))
             }
         }
     }
