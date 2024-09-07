@@ -2,21 +2,23 @@ package dev.toastbits.kotules.sample.extension
 
 import dev.toastbits.kotules.extension.annotation.KotuleImplementationAnnotation
 import dev.toastbits.kotules.extension.util.isDelayAvailable
+import dev.toastbits.kotules.sample.app.SampleDataClass
 import dev.toastbits.kotules.sample.app.SampleKotule
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.delay
 import kotlin.coroutines.coroutineContext
-import kotlin.js.JsExport
 
-@KotuleImplementationAnnotation(bindInterface = SampleKotule::class)
+@KotuleImplementationAnnotation
 @Suppress("JS_NAME_CLASH") // TODO
 class SampleKotuleImpl: SampleKotule {
     override val coolProperty: Int = 56
 
     override fun repeatInput(input: String, repeatCount: Int): String =
         input.repeat(repeatCount)
+
+    override suspend fun suspendInt(): Int = 64
 
     override suspend fun downloadFortune(): String {
         println("downloadFortune: Starting")
@@ -37,4 +39,10 @@ class SampleKotuleImpl: SampleKotule {
         println("downloadFortune: Returning result")
         return fortuneText
     }
+
+    override suspend fun getDataClass(): SampleDataClass =
+        SampleDataClass(
+            "SampleDataClass string value",
+//            listOf(1, 2, 3)
+        )
 }

@@ -15,6 +15,7 @@ kotlin {
     sourceSets {
         val jvmMain by getting {
             dependencies {
+                implementation(projects.binder.core)
                 implementation(projects.runtime)
                 implementation(libs.ksp.api)
                 implementation(libs.poet)

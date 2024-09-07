@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import util.configureAllComposeTargets
 import util.libCatalog
 import util.version
@@ -59,8 +60,8 @@ dependencies {
     add("kspCommonMainMetadata", projects.binder.extension)
 }
 
-//project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
-//    if (name != "kspCommonMainKotlinMetadata") {
-//        dependsOn("kspCommonMainKotlinMetadata")
-//    }
-//}
+project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
+    if (name != "kspCommonMainKotlinMetadata") {
+        dependsOn("kspCommonMainKotlinMetadata")
+    }
+}

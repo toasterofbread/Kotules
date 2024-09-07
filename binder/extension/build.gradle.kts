@@ -15,6 +15,7 @@ kotlin {
     sourceSets {
         val jvmMain by getting {
             dependencies {
+                implementation(projects.binder.core)
                 implementation(projects.extension)
                 implementation(libs.ksp.api)
                 implementation(libs.poet)
@@ -30,4 +31,3 @@ val projectVersion: String = project.libs.versions.project.name.get()
 mavenPublishing {
     coordinates("dev.toastbits.$projectName", "extension-binder", projectVersion)
 }
-

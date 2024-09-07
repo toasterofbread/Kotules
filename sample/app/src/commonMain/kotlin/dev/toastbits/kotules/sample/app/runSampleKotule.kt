@@ -12,6 +12,14 @@ suspend fun runSampleKotule() {
     val coolProperty: Int = kotule.coolProperty
     println("Got coolProperty: $coolProperty")
 
+    println("Calling suspendInt() on SampleKotule")
+    val intResult: Int = kotule.suspendInt()
+    println("Got result from downloadFortune: $intResult")
+
+    println("Calling getDataClass() on SampleKotule")
+    val dataClassResult: SampleDataClass = kotule.getDataClass()
+    println("Got result from getDataClass: $dataClassResult")
+
     println("Calling downloadFortune() on SampleKotule")
     val fortuneResult: String = kotule.downloadFortune()
     println("Got result from downloadFortune: $fortuneResult")

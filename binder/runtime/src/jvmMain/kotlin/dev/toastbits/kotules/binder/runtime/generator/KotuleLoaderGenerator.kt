@@ -13,18 +13,17 @@ import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.runtime.KotuleLoader
 
 internal class KotuleLoaderGenerator(
-    private val addImport: (String, String) -> Unit
-): KotuleTypeGenerator {
-    override fun generate(
-        kotuleInterface: KSClassDeclaration,
-        target: KmpTarget,
-        packageName: String
+    private val scope: FileGenerator.Scope
+) {
+    fun generate(
+        name: String,
+        kotuleInterface: KSClassDeclaration
     ): TypeSpec =
-        TypeSpec.objectBuilder(KotuleRuntimeBinderConstants.getLoaderName(kotuleInterface))
+        TypeSpec.objectBuilder(name)
             .apply {
                 addModifiers(KModifier.INTERNAL)
 
-                if (target == KmpTarget.COMMON) {
+                if (scope.target == KmpTarget.COMMON) {
                     addModifiers(KModifier.EXPECT)
                 }
                 else {
@@ -32,15 +31,14 @@ internal class KotuleLoaderGenerator(
                 }
 
                 addSuperinterface(KotuleLoader::class.asTypeName().plusParameter(kotuleInterface.toClassName()))
-                generateBody(target, kotuleInterface)
+                generateBody(kotuleInterface)
             }
             .build()
 
     private fun TypeSpec.Builder.generateBody(
-        target: KmpTarget,
         kotuleInterface: KSClassDeclaration
     ) {
-        when (target) {
+        when (scope.target) {
             KmpTarget.COMMON -> {}
             KmpTarget.JVM -> {
                 addFunction(
@@ -54,7 +52,7 @@ internal class KotuleLoaderGenerator(
                             )
                         )
                         .addCode(buildString {
-                            addImport("dev.toastbits.kotules.runtime", "loadKotuleFromJar")
+                            scope.import("dev.toastbits.kotules.runtime", "loadKotuleFromJar")
                             append("return loadKotuleFromJar(jarPath, implementationClass) as ${kotuleInterface.simpleName.asString()}")
                         })
                         .build()
@@ -74,7 +72,7 @@ internal class KotuleLoaderGenerator(
                         )
                         .addCode(buildString {
                             val mapperClass: String = KotuleRuntimeBinderConstants.getMapperName(kotuleInterface)
-                            addImport("dev.toastbits.kotules.runtime", "loadKotuleInputBindingFromKotlinJsCode")
+                            scope.import("dev.toastbits.kotules.runtime", "loadKotuleInputBindingFromKotlinJsCode")
 
                             append("return $mapperClass(loadKotuleInputBindingFromKotlinJsCode(jsCode, implementationClass))")
                         })

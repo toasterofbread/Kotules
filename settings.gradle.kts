@@ -22,6 +22,7 @@ rootProject.name = "Kotules"
 include(":extension")
 include(":runtime")
 include(":binder:extension")
+include(":binder:core")
 include(":binder:runtime")
 
 include(":sample:app")

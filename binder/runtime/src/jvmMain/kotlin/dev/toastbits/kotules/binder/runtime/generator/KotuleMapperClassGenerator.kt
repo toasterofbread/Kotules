@@ -3,11 +3,11 @@ package dev.toastbits.kotules.binder.runtime.generator
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSTypeReference
-import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
@@ -19,23 +19,24 @@ import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+import dev.toastbits.kotules.binder.runtime.util.PRIMITIVE_TYPES
+import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.type.ValueType
 
 internal class KotuleMapperClassGenerator(
-    private val addImport: (String, String) -> Unit
-): KotuleTypeGenerator {
+    private val scope: FileGenerator.Scope
+) {
     private val instanceName: String = KotuleRuntimeBinderConstants.MAPPER_INSTANCE_NAME
 
-    override fun generate(
-        kotuleInterface: KSClassDeclaration,
-        target: KmpTarget,
-        packageName: String
+    fun generate(
+        name: String,
+        kotuleInterface: KSClassDeclaration
     ): TypeSpec? =
-        if (target == KmpTarget.COMMON) null
-        else TypeSpec.classBuilder(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface)).apply {
-            val inputClassName: ClassName = ClassName(packageName, KotuleRuntimeBinderConstants.getInputBindingName(kotuleInterface))
+        if (scope.target == KmpTarget.COMMON || scope.target == KmpTarget.JVM) null
+        else TypeSpec.classBuilder(name).apply {
+            val inputClassName: ClassName = scope.importFromPackage(KotuleRuntimeBinderConstants.getInputBindingName(kotuleInterface))
 
             addModifiers(KModifier.INTERNAL)
 
@@ -52,10 +53,25 @@ internal class KotuleMapperClassGenerator(
                     .build()
             )
 
-            addSuperinterface(kotuleInterface.toClassName())
-
-            addProperties(kotuleInterface.getDeclaredProperties())
-            addFunctions(kotuleInterface.getDeclaredFunctions())
+            if (kotuleInterface.classKind == ClassKind.INTERFACE) {
+                addSuperinterface(kotuleInterface.toClassName())
+                addProperties(kotuleInterface.getDeclaredProperties())
+                addFunctions(kotuleInterface.getDeclaredFunctions())
+            }
+            else if (kotuleInterface.classKind == ClassKind.CLASS) {
+                addFunction(
+                    FunSpec.builder("getDataClass")
+                        .returns(kotuleInterface.toClassName())
+                        .addCode(buildString {
+                            append("return with ($instanceName) {\n    ")
+                            append(kotuleInterface.simpleName.asString())
+                            append('(')
+                            appendParameters(kotuleInterface.primaryConstructor!!.parameters)
+                            append(")\n}")
+                        })
+                        .build()
+                )
+            }
         }.build()
 
     private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
@@ -142,41 +158,28 @@ internal class KotuleMapperClassGenerator(
                         val awaitName: String = KotulePromise<ValueType>::await.name
                         val awaitPackage: String = KotulePromise::class.java.packageName
 
-                        addImport(awaitPackage, awaitName)
+                        scope.import(awaitPackage, awaitName)
 
                         if (returnType != null) {
                             append("return ")
                         }
                         append("$instanceName.${function.simpleName.asString()}(")
                         appendParameters(function.parameters)
-                        append(").$awaitName().value")
+                        append(").$awaitName()")
 
-//                        addImport("dev.toastbits.kotules.extension.$kotulePromiseName")
-//                        append("return $kotulePromiseName { ")
-//
-//                        val wrapperClass: KClass<*> = function.returnType!!.resolve().getOutputWrapperClass()
-//                        addImport(wrapperClass.qualifiedName!!)
-//
-//                        append("${wrapperClass.simpleName!!}(")
-//                        append("$instanceName.${function.simpleName.asString()}(")
-//                        for ((index, parameter) in function.parameters.withIndex()) {
-//                            append(parameter.name!!.asString())
-//                            if (index + 1 != function.parameters.size) {
-//                                append(", ")
-//                            }
-//                        }
-//                        append("))\n}")
+                        if (returnType != null) {
+                            val returnTypeClassName: ClassName = returnType.resolve().toClassName()
+                            if (PRIMITIVE_TYPES.contains(returnTypeClassName.canonicalName)) {
+                                append(".value")
+                            }
+                            else {
+                                val mapperName: String = KotuleRuntimeBinderConstants.getMapperName(returnTypeClassName.simpleName)
+                                scope.importFromPackage(mapperName)
+                                append(".let { $mapperName(it).getDataClass() }")
+                            }
+                        }
                     }
                 )
             }
             .build()
-}
-
-private fun StringBuilder.appendParameters(parameters: List<KSValueParameter>) {
-    for ((index, parameter) in parameters.withIndex()) {
-        append(parameter.name!!.asString())
-        if (index + 1 != parameters.size) {
-            append(", ")
-        }
-    }
 }

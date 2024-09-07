@@ -1,3 +1,5 @@
 package dev.toastbits.kotules.runtime
 
-actual interface KotuleInputBinding
+import dev.toastbits.kotules.extension.type.ValueType
+
+actual interface KotuleInputBinding: ValueType

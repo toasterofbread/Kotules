@@ -28,6 +28,12 @@ kotlin {
             kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/commonMain")
         }
 
+        val commonTest by getting {
+            dependencies {
+                implementation(projects.sample.extension)
+            }
+        }
+
         val jvmMain by getting {
             dependencies {
                 runtimeOnly(libs.ktor.client.cio)

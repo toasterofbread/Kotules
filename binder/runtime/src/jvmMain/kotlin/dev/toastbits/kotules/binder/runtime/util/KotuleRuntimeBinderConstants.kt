@@ -3,11 +3,17 @@ package dev.toastbits.kotules.binder.runtime.util
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 
 object KotuleRuntimeBinderConstants {
+    fun getInputBindingName(interfaceName: String): String =
+        "${interfaceName}_InputBinding"
+
     fun getInputBindingName(kotuleInterface: KSClassDeclaration): String =
-        kotuleInterface.simpleName.asString() + "_InputBinding"
+        getInputBindingName(kotuleInterface.simpleName.asString())
+
+    fun getMapperName(interfaceName: String): String =
+        "${interfaceName}_Mapper"
 
     fun getMapperName(kotuleInterface: KSClassDeclaration): String =
-        kotuleInterface.simpleName.asString() + "_Mapper"
+        getMapperName(kotuleInterface.simpleName.asString())
 
     fun getLoaderName(kotuleInterface: KSClassDeclaration): String =
         kotuleInterface.simpleName.asString() + "_Loader"

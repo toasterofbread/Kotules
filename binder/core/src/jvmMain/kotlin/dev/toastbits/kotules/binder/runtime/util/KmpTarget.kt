@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.binder.runtime.util
 
-internal enum class KmpTarget {
+enum class KmpTarget {
     COMMON,
     JVM,
     WASMJS,
@@ -17,7 +17,7 @@ internal enum class KmpTarget {
     }
 }
 
-internal fun KmpTarget.getSourceSetName(): String =
+fun KmpTarget.getSourceSetName(): String =
     when (this) {
         KmpTarget.COMMON -> "common"
         KmpTarget.JVM -> "jvm"

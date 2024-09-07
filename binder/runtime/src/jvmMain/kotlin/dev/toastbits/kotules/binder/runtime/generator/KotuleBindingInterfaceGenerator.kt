@@ -4,10 +4,12 @@ import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.Modifier
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
@@ -15,38 +17,55 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
-import dev.toastbits.kotules.runtime.KotuleInputBinding
-import dev.toastbits.kotules.extension.KotulePromise
-import dev.toastbits.kotules.extension.type.ValueType
-import dev.toastbits.kotules.binder.runtime.mapper.getInputWrapperClass
+import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
+import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+import dev.toastbits.kotules.extension.KotulePromise
+import dev.toastbits.kotules.extension.PlatformJsName
+import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.runtime.KotuleInputBinding
 
-internal class KotuleBindingInterfaceGenerator: KotuleTypeGenerator {
-    override fun generate(
-        kotuleInterface: KSClassDeclaration,
-        target: KmpTarget,
-        packageName: String
+internal class KotuleBindingInterfaceGenerator(
+    private val scope: FileGenerator.Scope
+) {
+    fun generate(
+        name: String,
+        kotuleInterface: KSClassDeclaration
     ): TypeSpec =
-        TypeSpec.interfaceBuilder(KotuleRuntimeBinderConstants.getInputBindingName(kotuleInterface)).apply {
+        TypeSpec.interfaceBuilder(name).apply {
             val expectationModifier: KModifier =
-                if (target == KmpTarget.COMMON) KModifier.EXPECT
+                if (scope.target == KmpTarget.COMMON) KModifier.EXPECT
                 else KModifier.ACTUAL
 
             addModifiers(expectationModifier, KModifier.INTERNAL)
 
-            if (target.isWeb()) {
+            if (scope.target.isWeb()) {
                 addModifiers(KModifier.EXTERNAL)
             }
 
-            if (target != KmpTarget.COMMON) {
-                addSuperinterface(KotuleInputBinding::class)
+            addSuperinterface(KotuleInputBinding::class)
+
+            if (scope.target == KmpTarget.COMMON) {
+                addAnnotation(
+                    AnnotationSpec.builder(Suppress::class)
+                        .addMember("\"NON_EXTERNAL_TYPE_EXTENDS_EXTERNAL_TYPE\"")
+                        .build()
+                )
             }
 
             addProperties(kotuleInterface.getDeclaredProperties(), expectationModifier)
             addFunctions(kotuleInterface.getDeclaredFunctions(), expectationModifier)
+
+            val mapperName: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface))
+            scope.generateNew(mapperName) {
+                KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
+                    this@generateNew.file.addType(it)
+                }
+            }
         }.build()
 
     private fun TypeSpec.Builder.addProperties(
@@ -85,8 +104,17 @@ internal class KotuleBindingInterfaceGenerator: KotuleTypeGenerator {
                         val returnType: KSTypeReference? = function.returnType
                         if (function.modifiers.contains(Modifier.SUSPEND)) {
                             val promiseTypeParam: ClassName =
-                                if (returnType != null) returnType.resolve().getInputWrapperClass().asClassName()
-                                else ValueType::class.asClassName()
+                                returnType?.resolve()?.let { type ->
+                                    type.getBuiltInInputWrapperClass()?.also { return@let it.asClassName() }
+
+                                    val declaration: KSDeclaration = type.declaration
+                                    check(declaration is KSClassDeclaration) { declaration }
+
+                                    val typeClass: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
+                                    scope.generateNew(typeClass) {
+                                        file.addType(interfaceGenerator.generate(typeClass.simpleName, declaration))
+                                    }
+                                } ?: ValueType::class.asClassName()
 
                             returns(KotulePromise::class.asClassName().plusParameter(promiseTypeParam))
                         }
