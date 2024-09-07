@@ -34,7 +34,7 @@ internal val FileGenerator.Scope.loaderGenerator: KotuleLoaderGenerator
 internal class KotuleRuntimeAnnotationProcessor(
     environment: SymbolProcessorEnvironment
 ): SymbolProcessor {
-    private val fileGenerator: FileGenerator = FileGenerator(environment.codeGenerator)
+    private val fileGenerator: FileGenerator = FileGenerator(environment.codeGenerator, environment.logger)
     private val logger: KSPLogger = environment.logger
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
@@ -47,6 +47,8 @@ internal class KotuleRuntimeAnnotationProcessor(
             generateClassBindings(kotuleInterface)
             generateLoaderInstanceExtension(kotuleInterface)
         }
+
+        fileGenerator.writeToDisk()
 
         return emptyList()
     }
@@ -63,7 +65,9 @@ internal class KotuleRuntimeAnnotationProcessor(
                 ),
                 target
             ) {
-                file.addType(interfaceGenerator.generate(bindingName, kotuleInterface))
+                interfaceGenerator.generate(bindingName, kotuleInterface)?.also {
+                    file.addType(it)
+                }
             }
             fileGenerator.generate(
                 ClassName(

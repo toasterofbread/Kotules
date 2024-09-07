@@ -2,6 +2,7 @@ package dev.toastbits.kotules.binder.runtime.generator
 
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.KSPLogger
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
@@ -12,10 +13,11 @@ import java.nio.charset.StandardCharsets
 import kotlin.reflect.KClass
 
 class FileGenerator(
-    private val codeGenerator: CodeGenerator
+    private val codeGenerator: CodeGenerator,
+    private val logger: KSPLogger
 ) {
-    private data class FileData(val packageName: String, val name: String, val target: KmpTarget)
-    private val writtenFiles: MutableList<FileData> = mutableListOf()
+    private data class FileLocation(val packageName: String, val name: String)
+    private val filesToWrite: MutableMap<FileLocation, MutableMap<KmpTarget, FileSpec?>> = mutableMapOf()
 
     fun generate(
         packageName: String,
@@ -23,32 +25,98 @@ class FileGenerator(
         target: KmpTarget,
         generationScope: Scope.() -> Unit
     ): ClassName {
-        val fileData: FileData = FileData(packageName, name, target)
-        if (writtenFiles.contains(fileData)) {
+        val fileLocation: FileLocation = FileLocation(packageName, name)
+
+        if (filesToWrite[fileLocation]?.containsKey(target) == true) {
             return ClassName(packageName, name)
         }
-        writtenFiles.add(fileData)
+
+        filesToWrite.getOrPut(fileLocation) { mutableMapOf() }[target] = null
 
         val fileSpecBuilder: FileSpec.Builder = FileSpec.builder(packageName, name)
 
         val scope: Scope = Scope(target, fileSpecBuilder, packageName)
         generationScope(scope)
-
-        val outputPath: String = target.getSourceSetName() + "Main." + packageName
-        val file: OutputStream =
-            codeGenerator.createNewFile(
-                Dependencies(false),
-                outputPath,
-                name,
-                extensionName =
-                    if (target == KmpTarget.COMMON) "kt"
-                    else "${target.getSourceSetName()}.kt"
-            )
-
-        val fileSpec: FileSpec = scope.file.build()
-        OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)
+        filesToWrite[fileLocation]!![target] = scope.file.build()
 
         return ClassName(packageName, name)
+    }
+
+    private fun removeEmptyFiles() {
+        for ((location, targets) in filesToWrite) {
+            for ((target, file) in targets.toMap()) {
+                if (file?.typeSpecs.isNullOrEmpty()) {
+                    targets.remove(target)
+                }
+            }
+        }
+    }
+
+    private fun writeFile(
+        fileSpec: FileSpec,
+        location: FileLocation,
+        target: KmpTarget,
+        commonGroupName: String = "common"
+    ) {
+        val outputPath: String = (
+            if (target == KmpTarget.COMMON) commonGroupName
+            else target.getSourceSetName()
+        ) + "Main." + location.packageName
+
+        val file: OutputStream =
+            try {
+                codeGenerator.createNewFile(
+                    Dependencies(false),
+                    outputPath,
+                    location.name,
+                    extensionName =
+                        if (target == KmpTarget.COMMON) "kt"
+                        else "${target.getSourceSetName()}.kt"
+                )
+            }
+            catch (e: Throwable) {
+                throw RuntimeException("$location | $target | $commonGroupName", e)
+            }
+
+        OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)
+    }
+
+    fun writeToDisk() {
+        removeEmptyFiles()
+
+        for ((location, targets) in filesToWrite) {
+            val groupsWithCommon: Map<String, List<KmpTarget>> = KmpTarget.GROUPS.entries.associate { it.key to it.value + KmpTarget.COMMON }
+            var groupFound: Boolean = false
+
+            val allowedGroups: Map<String, List<KmpTarget>> =
+                if (targets.keys.singleOrNull() == KmpTarget.COMMON) mapOf("common" to listOf(KmpTarget.COMMON))
+                else mapOf("common" to KmpTarget.entries) + groupsWithCommon
+
+            for ((groupName, groupTargets) in allowedGroups) {
+                if (targets.keys.size != groupTargets.size || !targets.keys.containsAll(groupTargets)) {
+                    continue
+                }
+
+                groupFound = true
+
+                for ((target, file) in targets) {
+                    logger.warn("write1 $target $location")
+                    writeFile(file!!, location, target, groupName)
+                }
+                break
+            }
+
+            if (groupFound) {
+                continue
+            }
+
+            for ((target, file) in targets) {
+                logger.warn("write2 $target $location")
+                writeFile(file!!, location, target)
+            }
+        }
+
+        filesToWrite.clear()
     }
 
     fun generate(

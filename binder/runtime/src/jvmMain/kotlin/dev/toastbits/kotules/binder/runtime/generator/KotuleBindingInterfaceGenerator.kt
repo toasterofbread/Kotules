@@ -38,8 +38,9 @@ internal class KotuleBindingInterfaceGenerator(
     fun generate(
         name: String,
         kotuleInterface: KSClassDeclaration
-    ): TypeSpec =
-        TypeSpec.interfaceBuilder(name).apply {
+    ): TypeSpec? =
+        if (scope.target != KmpTarget.COMMON && !scope.target.isWeb()) null
+        else TypeSpec.interfaceBuilder(name).apply {
             val expectationModifier: KModifier =
                 if (scope.target == KmpTarget.COMMON) KModifier.EXPECT
                 else KModifier.ACTUAL
@@ -123,7 +124,9 @@ internal class KotuleBindingInterfaceGenerator(
 
                 outPropertyType = scope.resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(propertyType.toClassName().simpleName))
                 scope.generateNew(outPropertyType) {
-                    file.addType(interfaceGenerator.generate(outPropertyType.simpleName, typeDeclaration))
+                    interfaceGenerator.generate(outPropertyType.simpleName, typeDeclaration)?.also {
+                        file.addType(it)
+                    }
                 }
             }
 
@@ -166,7 +169,9 @@ internal class KotuleBindingInterfaceGenerator(
 
                                     val typeClass: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
                                     scope.generateNew(typeClass) {
-                                        file.addType(interfaceGenerator.generate(typeClass.simpleName, declaration))
+                                        interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
+                                            file.addType(it)
+                                        }
                                     }
                                 } ?: ValueType::class.asClassName()
 

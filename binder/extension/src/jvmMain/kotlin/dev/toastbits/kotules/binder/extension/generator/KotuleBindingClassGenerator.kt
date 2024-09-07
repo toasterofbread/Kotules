@@ -65,7 +65,10 @@ internal class KotuleBindingClassGenerator(
             )
 
             addProperties(kotuleClass.getDeclaredProperties())
-            addFunctions(kotuleClass.getDeclaredFunctions())
+
+            val functions: Sequence<KSFunctionDeclaration> =
+                kotuleClass.getDeclaredFunctions().filterRelevantFunctions(kotuleClass)
+            addFunctions(functions)
 
             if (primaryConstructor != null) {
                 primaryConstructor(
@@ -133,10 +136,6 @@ internal class KotuleBindingClassGenerator(
     private fun TypeSpec.Builder.addFunctions(functions: Sequence<KSFunctionDeclaration>) {
         for (function in functions) {
             if (function.isConstructor()) {
-                continue
-            }
-
-            if (Any::class.java.declaredMethods.any { it.name == function.simpleName.asString() }) {
                 continue
             }
 
@@ -237,4 +236,28 @@ internal class KotuleBindingClassGenerator(
                 )
             }
             .build()
+
+
+    private fun Sequence<KSFunctionDeclaration>.filterRelevantFunctions(kotuleClass: KSClassDeclaration): Sequence<KSFunctionDeclaration> =
+        filter { function ->
+            val functionName: String = function.simpleName.asString()
+            if (Any::class.java.declaredMethods.any { it.name == functionName }) {
+                return@filter false
+            }
+
+            if (kotuleClass.modifiers.contains(Modifier.DATA)) {
+                if (functionName == "copy") {
+                    return@filter false
+                }
+
+                if (
+                    (1 .. kotuleClass.primaryConstructor!!.parameters.size)
+                        .any { functionName == "component$it" }
+                ) {
+                    return@filter false
+                }
+            }
+
+            return@filter true
+        }
 }
