@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinHierarchyBuilder
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 import java.io.File
 
 fun KotlinMultiplatformExtension.configureAllKmpTargets(
@@ -161,6 +162,16 @@ fun KotlinJsTargetDsl.configureWasmOrJs() {
     moduleName = project.getCurrentPackage()
     useCommonJs()
     browser {
+        commonWebpackConfig {
+            devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
+                static = (static ?: mutableListOf()).apply {
+                    // Serve sources to debug inside browser
+                    add(project.rootDir.path)
+                    add(project.projectDir.path)
+                }
+            }
+        }
+
         testTask {
             useKarma {
                 useFirefox()

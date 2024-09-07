@@ -14,12 +14,21 @@ import kotlin.reflect.KClass
 class FileGenerator(
     private val codeGenerator: CodeGenerator
 ) {
+    private data class FileData(val packageName: String, val name: String, val target: KmpTarget)
+    private val writtenFiles: MutableList<FileData> = mutableListOf()
+
     fun generate(
         packageName: String,
         name: String,
         target: KmpTarget,
         generationScope: Scope.() -> Unit
     ): ClassName {
+        val fileData: FileData = FileData(packageName, name, target)
+        if (writtenFiles.contains(fileData)) {
+            return ClassName(packageName, name)
+        }
+        writtenFiles.add(fileData)
+
         val fileSpecBuilder: FileSpec.Builder = FileSpec.builder(packageName, name)
 
         val scope: Scope = Scope(target, fileSpecBuilder, packageName)

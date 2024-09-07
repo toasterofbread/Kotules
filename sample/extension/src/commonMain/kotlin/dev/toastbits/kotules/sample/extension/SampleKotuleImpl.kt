@@ -43,6 +43,18 @@ class SampleKotuleImpl: SampleKotule {
     override suspend fun getDataClass(): SampleDataClass =
         SampleDataClass(
             "SampleDataClass string value",
-//            listOf(1, 2, 3)
+            SampleDataClass(
+                "string 2",
+                SampleDataClass(
+                    "string 3",
+                    SampleDataClass(
+                        "string 4",
+                        SampleDataClass(
+                            "string 5",
+                            null
+                        )
+                    )
+                )
+            )
         )
 }

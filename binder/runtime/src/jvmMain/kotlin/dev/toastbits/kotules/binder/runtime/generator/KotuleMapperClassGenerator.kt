@@ -53,25 +53,9 @@ internal class KotuleMapperClassGenerator(
                     .build()
             )
 
-            if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                addSuperinterface(kotuleInterface.toClassName())
-                addProperties(kotuleInterface.getDeclaredProperties())
-                addFunctions(kotuleInterface.getDeclaredFunctions())
-            }
-            else if (kotuleInterface.classKind == ClassKind.CLASS) {
-                addFunction(
-                    FunSpec.builder("getDataClass")
-                        .returns(kotuleInterface.toClassName())
-                        .addCode(buildString {
-                            append("return with ($instanceName) {\n    ")
-                            append(kotuleInterface.simpleName.asString())
-                            append('(')
-                            appendParameters(kotuleInterface.primaryConstructor!!.parameters)
-                            append(")\n}")
-                        })
-                        .build()
-                )
-            }
+            addSuperinterface(kotuleInterface.toClassName())
+            addProperties(kotuleInterface.getDeclaredProperties())
+            addFunctions(kotuleInterface.getDeclaredFunctions())
         }.build()
 
     private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
@@ -168,15 +152,7 @@ internal class KotuleMapperClassGenerator(
                         append(").$awaitName()")
 
                         if (returnType != null) {
-                            val returnTypeClassName: ClassName = returnType.resolve().toClassName()
-                            if (PRIMITIVE_TYPES.contains(returnTypeClassName.canonicalName)) {
-                                append(".value")
-                            }
-                            else {
-                                val mapperName: String = KotuleRuntimeBinderConstants.getMapperName(returnTypeClassName.simpleName)
-                                scope.importFromPackage(mapperName)
-                                append(".let { $mapperName(it).getDataClass() }")
-                            }
+                            append(".value")
                         }
                     }
                 )

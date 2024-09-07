@@ -7,8 +7,10 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.AnnotationSpec
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.PropertySpec
@@ -80,14 +82,46 @@ internal class KotuleBindingClassGenerator(
 
     private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
         for (property in properties) {
+            val propertyType: KSType = property.type.resolve()
+            val outPropertyType: ClassName
+
+            val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(propertyType.toClassName().canonicalName)
+            if (isPrimitive) {
+                outPropertyType = propertyType.toClassName()
+            }
+            else {
+                val outputBindingName: String = KotuleExtensionBinderConstants.getOutputBindingName(propertyType.toClassName().simpleName)
+                outPropertyType = scope.generateNew(scope.resolveInPackage(outputBindingName)) {
+                    file.addType(KotuleBindingClassGenerator(this).generate(outputBindingName, propertyType.declaration as KSClassDeclaration)!!)
+                }
+            }
+
             addProperty(
-                PropertySpec.builder(property.simpleName.asString(), property.type.toTypeName())
+                PropertySpec.builder(property.simpleName.asString(), outPropertyType.copy(nullable = propertyType.isMarkedNullable))
                     .apply {
                         property.getter?.also { getter ->
                             getter(
-                                FunSpec.getterBuilder().addCode(
-                                    "return $instanceName.${property.simpleName.asString()}"
-                                ).build()
+                                FunSpec.getterBuilder()
+                                    .addCode(
+                                        buildString {
+                                            append("return ")
+                                            if (isPrimitive) {
+                                                append("$instanceName.${property.simpleName.asString()}")
+                                            }
+                                            else {
+                                                append("$instanceName.${property.simpleName.asString()}")
+                                                if (propertyType.isMarkedNullable) {
+                                                    append('?')
+                                                }
+                                                append(".let {\n${outPropertyType.simpleName}(")
+
+                                                val params: List<KSValueParameter> = (propertyType.declaration as KSClassDeclaration).primaryConstructor?.parameters.orEmpty()
+                                                appendParameters(params) { "it.$it" }
+                                                append(")\n}")
+                                            }
+                                        }
+                                    )
+                                    .build()
                             )
                         }
                     }

@@ -18,6 +18,7 @@ suspend fun runSampleKotule() {
 
     println("Calling getDataClass() on SampleKotule")
     val dataClassResult: SampleDataClass = kotule.getDataClass()
+//    val dataClassResult: SampleDataClass = kotule.getDataClass()
     println("Got result from getDataClass: $dataClassResult")
 
     println("Calling downloadFortune() on SampleKotule")

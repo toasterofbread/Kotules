@@ -84,15 +84,28 @@ for (target in listOf("wasmJs", "js")) {
     tasks.named("${target}BrowserDevelopmentExecutableDistribution") {
         dependOnTaskAndCopyOutputDirectory(":sample:extension:jsBrowserDevelopmentExecutableDistribution", "developmentExecutable")
     }
+
+    tasks.named("${target}BrowserDevelopmentRun") {
+        dependOnTaskAndCopyOutputDirectory(
+            ":sample:extension:jsBrowserDevelopmentExecutableDistribution",
+            "developmentExecutable",
+            project.layout.buildDirectory.asFile.get()
+                .resolve("processedResources/$target/main").absolutePath,
+            first = true
+        )
+    }
 }
 
-fun Task.dependOnTaskAndCopyOutputDirectory(taskPath: String, dirName: String) {
+fun Task.dependOnTaskAndCopyOutputDirectory(taskPath: String, theirDir: String, ourDir: String = theirDir, first: Boolean = false) {
     dependsOn(taskPath)
 
     outputs.upToDateWhen { false }
 
-    doLast {
-        val appProductionExecutable: File = outputs.files.single { it.name == dirName }
+    val configure: Task.() -> Unit = {
+        val output: File? =
+            if (ourDir.startsWith("/")) File(ourDir)
+            else outputs.files.singleOrNull { it.name == ourDir }
+        checkNotNull(output) { "$ourDir | ${outputs.files.map { it.absolutePath }}" }
 
         val taskParts: List<String> = taskPath.split(':').filter { it.isNotBlank() }
         var currentProject = rootProject
@@ -101,10 +114,18 @@ fun Task.dependOnTaskAndCopyOutputDirectory(taskPath: String, dirName: String) {
         }
 
         val workerBuildTask: Task by currentProject.tasks.named(taskParts.last())
-        val workerProductionExecutable: File = workerBuildTask.outputs.files.single { it.name == dirName }
+        val workerProductionExecutable: File? = workerBuildTask.outputs.files.singleOrNull { it.name == theirDir }
+        checkNotNull(workerProductionExecutable) { theirDir }
 
         for (file in workerProductionExecutable.listFiles().orEmpty()) {
-            file.copyRecursively(appProductionExecutable.resolve(file.name), overwrite = true)
+            file.copyRecursively(output.resolve(file.name), overwrite = true)
         }
+    }
+
+    if (first) {
+        doFirst(configure)
+    }
+    else {
+        doLast(configure)
     }
 }

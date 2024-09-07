@@ -17,5 +17,6 @@ interface SampleKotule: Kotule {
 
 data class SampleDataClass(
     val stringValue: String,
+    val dataValue: SampleDataClass?
 //    val list: List<Int>
 )
