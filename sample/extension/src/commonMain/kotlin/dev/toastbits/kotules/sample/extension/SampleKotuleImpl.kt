@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.sample.extension
 
-import dev.toastbits.kotules.extension.annotation.KotuleImplementationAnnotation
+import dev.toastbits.kotules.extension.annotation.KotuleDefinition
 import dev.toastbits.kotules.extension.util.isDelayAvailable
 import dev.toastbits.kotules.sample.app.SampleDataClass
 import dev.toastbits.kotules.sample.app.SampleKotule
@@ -10,7 +10,7 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.delay
 import kotlin.coroutines.coroutineContext
 
-@KotuleImplementationAnnotation
+@KotuleDefinition
 @Suppress("JS_NAME_CLASH") // TODO
 class SampleKotuleImpl: SampleKotule {
     override val intProperty: Int = 56

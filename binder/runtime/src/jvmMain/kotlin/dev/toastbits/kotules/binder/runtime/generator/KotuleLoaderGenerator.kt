@@ -42,7 +42,7 @@ internal class KotuleLoaderGenerator(
             KmpTarget.COMMON -> {}
             KmpTarget.JVM -> {
                 addFunction(
-                    FunSpec.builder("loadFromJar")
+                    FunSpec.builder("loadFromJarFile")
                         .returns(kotuleInterface.toClassName())
                         .addModifiers(KModifier.OVERRIDE)
                         .addParameters(
@@ -52,8 +52,24 @@ internal class KotuleLoaderGenerator(
                             )
                         )
                         .addCode(buildString {
-                            scope.import("dev.toastbits.kotules.runtime", "loadKotuleFromJar")
-                            append("return loadKotuleFromJar(jarPath, implementationClass) as ${kotuleInterface.simpleName.asString()}")
+                            scope.import("dev.toastbits.kotules.runtime", "loadKotuleFromJarFile")
+                            append("return loadKotuleFromJarFile(jarPath, implementationClass) as ${kotuleInterface.simpleName.asString()}")
+                        })
+                        .build()
+                )
+                addFunction(
+                    FunSpec.builder("loadFromJarBytes")
+                        .returns(kotuleInterface.toClassName())
+                        .addModifiers(KModifier.OVERRIDE)
+                        .addParameters(
+                            listOf(
+                                ParameterSpec.builder("jarBytes", ByteArray::class).build(),
+                                ParameterSpec.builder("implementationClass", String::class).build()
+                            )
+                        )
+                        .addCode(buildString {
+                            scope.import("dev.toastbits.kotules.runtime", "loadKotuleFromJarBytes")
+                            append("return loadKotuleFromJarBytes(jarBytes, implementationClass) as ${kotuleInterface.simpleName.asString()}")
                         })
                         .build()
                 )

@@ -12,5 +12,5 @@ actual suspend fun loadSampleKotule(): SampleKotule {
         .resolve(SampleConfig.JVM_EXTENSION_FILE)
         .normalize()
 
-    return SampleKotule_Loader.loadFromJar(jarPath.pathString, SampleConfig.EXTENSION_IMPL_CLASS)
+    return SampleKotule_Loader.loadFromJarFile(jarPath.pathString, SampleConfig.EXTENSION_IMPL_CLASS)
 }

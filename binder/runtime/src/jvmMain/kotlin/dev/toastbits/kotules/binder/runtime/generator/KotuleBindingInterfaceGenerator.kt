@@ -27,11 +27,43 @@ import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
-import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.type.ValueType
 import dev.toastbits.kotules.extension.util.LIST_TYPES
+import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.runtime.KotuleInputBinding
+
+private fun FileGenerator.Scope.getInteropTypeFor(type: KSType, canBePrimitive: Boolean = false): TypeName {
+    val canonicalName: String = type.toClassName().canonicalName
+    if (canBePrimitive && PRIMITIVE_TYPES.contains(canonicalName) && !LIST_TYPES.contains(canonicalName)) {
+        return type.toTypeName()
+    }
+
+    type.getBuiltInInputWrapperClass(this)?.also { return it }
+
+    if (canonicalName.startsWith("kotlin.Function")) {
+        return getFunctionInteropType(type)
+    }
+
+    val declaration: KSDeclaration = type.declaration
+    check(declaration is KSClassDeclaration) { declaration }
+
+    val typeClass: ClassName = resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
+    log("Generating input interop type for $type (${type.toClassName()})")
+
+    return generateNew(typeClass) {
+        interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
+            file.addType(it)
+        }
+    }
+}
+
+private fun FileGenerator.Scope.getFunctionInteropType(type: KSType): TypeName =
+    type.toClassName().parameterizedBy(
+        type.arguments.map {
+            getInteropTypeFor(it.type!!.resolve(), canBePrimitive = true)
+        }
+    )
 
 internal class KotuleBindingInterfaceGenerator(
     private val scope: FileGenerator.Scope
@@ -132,27 +164,7 @@ internal class KotuleBindingInterfaceGenerator(
         expectationModifier: KModifier
     ) {
         for ((propertyName, propertyType) in properties) {
-            val outPropertyType: TypeName
-
-            if (PRIMITIVE_TYPES.contains(propertyType.toClassName().canonicalName)) {
-                if (LIST_TYPES.contains(propertyType.toClassName().canonicalName)) {
-                    outPropertyType = propertyType.getBuiltInInputWrapperClass()!!
-                }
-                else {
-                    outPropertyType = propertyType.toTypeName()
-                }
-            }
-            else {
-                val typeDeclaration: KSDeclaration = propertyType.declaration
-                check(typeDeclaration is KSClassDeclaration) { typeDeclaration }
-
-                outPropertyType = scope.resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(propertyType.toClassName().simpleName))
-                scope.generateNew(outPropertyType) {
-                    interfaceGenerator.generate(outPropertyType.simpleName, typeDeclaration)?.also {
-                        file.addType(it)
-                    }
-                }
-            }
+            val outPropertyType: TypeName = scope.getInteropTypeFor(propertyType, canBePrimitive = true)
 
             addProperty(
                 PropertySpec.builder(
@@ -188,29 +200,17 @@ internal class KotuleBindingInterfaceGenerator(
                         val returnType: KSType? = function.returnType?.resolve()
                         if (function.modifiers.contains(Modifier.SUSPEND)) {
                             val promiseTypeParam: TypeName =
-                                returnType?.let { type ->
-                                    type.getBuiltInInputWrapperClass()?.also { return@let it }
-
-                                    val declaration: KSDeclaration = type.declaration
-                                    check(declaration is KSClassDeclaration) { declaration }
-
-                                    val typeClass: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
-                                    scope.generateNew(typeClass) {
-                                        interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
-                                            file.addType(it)
-                                        }
-                                    }
-                                } ?: ValueType::class.asClassName()
+                                returnType?.let { scope.getInteropTypeFor(it) }
+                                ?: ValueType::class.asClassName()
 
                             returns(KotulePromise::class.asClassName().plusParameter(promiseTypeParam))
                         }
                         else if (returnType != null) {
-                            returns(returnType.toTypeName())
+                            returns(scope.getInteropTypeFor(returnType, canBePrimitive = true))
                         }
 
                         for (parameter in function.parameters) {
-                            scope.log("PARAM ${function.simpleName.asString()} $parameter")
-                            addParameter(parameter.name!!.asString(), parameter.type.toTypeName())
+                            addParameter(parameter.name!!.asString(), scope.getInteropTypeFor(parameter.type.resolve(), canBePrimitive = true))
                         }
                     }
                     .build()

@@ -1,9 +1,9 @@
 package dev.toastbits.kotules.sample.app
 
 import dev.toastbits.kotules.extension.Kotule
-import dev.toastbits.kotules.runtime.annotation.KotuleAnnotation
+import dev.toastbits.kotules.runtime.annotation.KotuleDeclaration
 
-@KotuleAnnotation
+@KotuleDeclaration
 interface SampleKotule: Kotule {
     val intProperty: Int
     fun repeatInput(input: String, repeatCount: Int): String

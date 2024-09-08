@@ -9,18 +9,21 @@ val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
         Int::class,
         List::class,
         EmptyList::class,
-        ArrayList::class
+        ArrayList::class,
+        Function::class
     )
 
 val LIST_TYPES: List<String> =
     listOf(
         "kotlin.collections.List",
         "kotlin.collections.ArrayList",
-        "kotlin.collections.EmptyList"
+        "kotlin.collections.EmptyList",
+        "kotlin.collections.Set",
+        "kotlin.collections.EmptySet"
     )
 
 val PRIMITIVE_TYPES: List<String> =
     listOf(
         "kotlin.String",
-        "kotlin.Int"
+        "kotlin.Int",
     ) + LIST_TYPES

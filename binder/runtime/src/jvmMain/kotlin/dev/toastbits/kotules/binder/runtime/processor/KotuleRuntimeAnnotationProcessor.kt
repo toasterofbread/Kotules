@@ -22,7 +22,7 @@ import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.extension.Kotule
 import dev.toastbits.kotules.runtime.KotuleLoader
-import dev.toastbits.kotules.runtime.annotation.KotuleAnnotation
+import dev.toastbits.kotules.runtime.annotation.KotuleDeclaration
 import kotlin.reflect.KClass
 
 internal val FileGenerator.Scope.interfaceGenerator: KotuleBindingInterfaceGenerator
@@ -39,7 +39,7 @@ internal class KotuleRuntimeAnnotationProcessor(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val kotuleInterfaces: Sequence<KSClassDeclaration> =
-            resolver.getSymbolsWithAnnotation(KotuleAnnotation::class.qualifiedName!!)
+            resolver.getSymbolsWithAnnotation(KotuleDeclaration::class.qualifiedName!!)
                 .filterIsInstance<KSClassDeclaration>()
 
         for (kotuleInterface in kotuleInterfaces) {

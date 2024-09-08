@@ -15,7 +15,7 @@ import dev.toastbits.kotules.binder.extension.generator.KotuleBindingClassGenera
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.extension.annotation.KotuleImplementationAnnotation
+import dev.toastbits.kotules.extension.annotation.KotuleDefinition
 
 internal class KotuleExtensionAnnotationProcessor(
     environment: SymbolProcessorEnvironment
@@ -25,7 +25,7 @@ internal class KotuleExtensionAnnotationProcessor(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val kotuleClasses: Sequence<KSClassDeclaration> =
-            resolver.getSymbolsWithAnnotation(KotuleImplementationAnnotation::class.qualifiedName!!)
+            resolver.getSymbolsWithAnnotation(KotuleDefinition::class.qualifiedName!!)
                 .filterIsInstance<KSClassDeclaration>()
 
         for (kotuleClass in kotuleClasses) {
