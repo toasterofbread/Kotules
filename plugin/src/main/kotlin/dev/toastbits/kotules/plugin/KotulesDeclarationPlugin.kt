@@ -8,13 +8,5 @@ class KotulesDeclarationPlugin: KotulePluginBase() {
         super.apply(project)
 
         project.dependencies.add("kspCommonMainMetadata", "dev.toastbits.kotules:runtime-binder:$kotulesVersion")
-
-        project.afterEvaluate {
-            project.kotlinExtension.sourceSets.named("commonMain").configure {
-                it.dependencies {
-                    implementation("dev.toastbits.kotules:runtime:$kotulesVersion")
-                }
-            }
-        }
     }
 }

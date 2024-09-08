@@ -25,9 +25,15 @@ abstract class KotulePluginBase: Plugin<Project> {
 
         project.afterEvaluate {
             project.kotlinExtension.sourceSets.apply {
+                named("commonMain").configure {
+                    it.dependencies {
+                        implementation("dev.toastbits.kotules:runtime:$kotulesVersion")
+                        implementation("dev.toastbits.kotules:extension:$kotulesVersion")
+                    }
+                }
+
                 val sourceSets: List<String> = listOf("common", "jvm", "wasmJs", "js") + KmpTarget.GROUPS.keys
                 for (sourceSet in sourceSets.map { it + "Main" }) {
-
                     try {
                         getByName(sourceSet).kotlin.srcDirs(
                             "build/generated/ksp/metadata/commonMain/kotlin/$sourceSet",
