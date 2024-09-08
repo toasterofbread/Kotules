@@ -3,6 +3,7 @@ package dev.toastbits.kotules.binder.runtime.generator
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
+import com.google.devtools.ksp.symbol.KSNode
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
@@ -18,6 +19,11 @@ class FileGenerator(
 ) {
     private data class FileLocation(val packageName: String, val name: String)
     private val filesToWrite: MutableMap<FileLocation, MutableMap<KmpTarget, FileSpec?>> = mutableMapOf()
+
+    private var log: String = "\n"
+    fun log(msg: Any?) {
+        log += "$msg\n"
+    }
 
     fun generate(
         packageName: String,
@@ -36,49 +42,17 @@ class FileGenerator(
         val fileSpecBuilder: FileSpec.Builder = FileSpec.builder(packageName, name)
 
         val scope: Scope = Scope(target, fileSpecBuilder, packageName)
-        generationScope(scope)
+
+        try {
+            generationScope(scope)
+        }
+        catch (e: Throwable) {
+            logger.error("$log\n\n$fileLocation ${e.stackTraceToString()}")
+        }
+
         filesToWrite[fileLocation]!![target] = scope.file.build()
 
         return ClassName(packageName, name)
-    }
-
-    private fun removeEmptyFiles() {
-        for ((location, targets) in filesToWrite) {
-            for ((target, file) in targets.toMap()) {
-                if (file?.typeSpecs.isNullOrEmpty()) {
-                    targets.remove(target)
-                }
-            }
-        }
-    }
-
-    private fun writeFile(
-        fileSpec: FileSpec,
-        location: FileLocation,
-        target: KmpTarget,
-        commonGroupName: String = "common"
-    ) {
-        val outputPath: String = (
-            if (target == KmpTarget.COMMON) commonGroupName
-            else target.getSourceSetName()
-        ) + "Main." + location.packageName
-
-        val file: OutputStream =
-            try {
-                codeGenerator.createNewFile(
-                    Dependencies(false),
-                    outputPath,
-                    location.name,
-                    extensionName =
-                        if (target == KmpTarget.COMMON) "kt"
-                        else "${target.getSourceSetName()}.kt"
-                )
-            }
-            catch (e: Throwable) {
-                throw RuntimeException("$location | $target | $commonGroupName", e)
-            }
-
-        OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)
     }
 
     fun writeToDisk() {
@@ -100,7 +74,6 @@ class FileGenerator(
                 groupFound = true
 
                 for ((target, file) in targets) {
-                    logger.warn("write1 $target $location")
                     writeFile(file!!, location, target, groupName)
                 }
                 break
@@ -111,7 +84,6 @@ class FileGenerator(
             }
 
             for ((target, file) in targets) {
-                logger.warn("write2 $target $location")
                 writeFile(file!!, location, target)
             }
         }
@@ -125,6 +97,47 @@ class FileGenerator(
         generationScope: Scope.() -> Unit
     ): ClassName =
         generate(className.packageName, className.simpleName, target, generationScope)
+
+    private fun removeEmptyFiles() {
+        for ((location, targets) in filesToWrite) {
+            for ((target, file) in targets.toMap()) {
+                if (file?.typeSpecs.isNullOrEmpty()) {
+                    targets.remove(target)
+                }
+            }
+        }
+    }
+
+    private fun writeFile(
+        fileSpec: FileSpec,
+        location: FileLocation,
+        target: KmpTarget,
+        commonGroupName: String = "common"
+    ) {
+        val outputPath: String = (
+                if (target == KmpTarget.COMMON) commonGroupName
+                else target.getSourceSetName()
+                ) + "Main." + location.packageName
+
+        val file: OutputStream =
+            try {
+                codeGenerator.createNewFile(
+                    Dependencies(false),
+                    outputPath,
+                    location.name,
+                    extensionName =
+                        if (target == KmpTarget.COMMON)
+                            if (commonGroupName == "common") "kt"
+                            else "$commonGroupName.kt"
+                        else "${target.getSourceSetName()}.kt"
+                )
+            }
+            catch (e: Throwable) {
+                throw RuntimeException("$location | $target | $commonGroupName", e)
+            }
+
+        OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)
+    }
 
     inner class Scope(
         val target: KmpTarget,
@@ -148,5 +161,7 @@ class FileGenerator(
 
         fun generateNew(className: ClassName, generationScope: Scope.() -> Unit): ClassName =
             generate(className, target, generationScope)
+
+        fun log(msg: Any?) = this@FileGenerator.log(msg)
     }
 }

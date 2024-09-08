@@ -3,7 +3,6 @@ package dev.toastbits.kotules.binder.runtime.generator
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
-import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
@@ -19,11 +18,11 @@ import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
-import dev.toastbits.kotules.binder.runtime.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.extension.util.LIST_TYPES
 
 internal class KotuleMapperClassGenerator(
     private val scope: FileGenerator.Scope
@@ -152,7 +151,13 @@ internal class KotuleMapperClassGenerator(
                         append(").$awaitName()")
 
                         if (returnType != null) {
-                            append(".value")
+                            if (LIST_TYPES.contains(returnType.resolve().toClassName().canonicalName)) {
+                                scope.import("dev.toastbits.kotules.extension.type.input", "getListValue")
+                                append(".getListValue().map { it.value }")
+                            }
+                            else {
+                                append(".value")
+                            }
                         }
                     }
                 )

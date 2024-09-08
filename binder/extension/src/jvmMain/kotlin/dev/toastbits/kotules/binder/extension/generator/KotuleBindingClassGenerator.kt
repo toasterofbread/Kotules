@@ -1,34 +1,36 @@
 package dev.toastbits.kotules.binder.extension.generator
 
-import com.google.devtools.ksp.getDeclaredFunctions
-import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.AnnotationSpec
-import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.WildcardTypeName
+import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.binder.runtime.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.extension.OutKotulePromise
 import dev.toastbits.kotules.extension.PlatformJsExport
 import dev.toastbits.kotules.extension.PlatformJsName
 import dev.toastbits.kotules.extension.kotulePromise
 import dev.toastbits.kotules.extension.type.OutValue
+import dev.toastbits.kotules.extension.type.OutValueContainer
+import dev.toastbits.kotules.extension.util.LIST_TYPES
+import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import kotlin.reflect.KCallable
 
 internal class KotuleBindingClassGenerator(
@@ -44,7 +46,13 @@ internal class KotuleBindingClassGenerator(
         else TypeSpec.classBuilder(name).apply {
             val primaryConstructor: KSFunctionDeclaration? = kotuleClass.primaryConstructor
 
-            val instanceType: TypeName = kotuleClass.asType(emptyList()).toTypeName()
+            val instanceType: TypeName =
+                try {
+                    kotuleClass.asType(emptyList()).toTypeName()
+                }
+                catch (e: Throwable) {
+                    throw RuntimeException("$name $kotuleClass", e)
+                }
             addProperty(
                 PropertySpec.builder(instanceName, instanceType)
                     .addModifiers(KModifier.PRIVATE)
@@ -64,10 +72,10 @@ internal class KotuleBindingClassGenerator(
                     .build()
             )
 
-            addProperties(kotuleClass.getDeclaredProperties())
+            addProperties(kotuleClass.getAllProperties().associate { it.simpleName.asString() to it.type.resolve() })
 
             val functions: Sequence<KSFunctionDeclaration> =
-                kotuleClass.getDeclaredFunctions().filterRelevantFunctions(kotuleClass)
+                kotuleClass.getAllFunctions().filterRelevantFunctions(kotuleClass)
             addFunctions(functions)
 
             if (primaryConstructor != null) {
@@ -83,50 +91,85 @@ internal class KotuleBindingClassGenerator(
             }
         }.build()
 
-    private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
-        for (property in properties) {
-            val propertyType: KSType = property.type.resolve()
-            val outPropertyType: ClassName
+    private fun TypeSpec.Builder.addProperties(properties: Map<String, KSType>) {
+        for ((propertyName, propertyType) in properties) {
+            val outPropertyType: TypeName
+            val outPropertyTypeConstructor: String?
 
             val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(propertyType.toClassName().canonicalName)
             if (isPrimitive) {
-                outPropertyType = propertyType.toClassName()
+                if (LIST_TYPES.contains(propertyType.toClassName().canonicalName)) {
+                    outPropertyType = OutValueContainer::class.asClassName()
+                        .plusParameter(WildcardTypeName.producerOf(Any::class.asTypeName().copy(nullable = true)))
+
+                    val outValue: (Any) -> Any = ::OutValue
+                    outPropertyTypeConstructor = (outValue as KCallable<*>).name
+                    scope.import("dev.toastbits.kotules.extension.type", outPropertyTypeConstructor)
+                }
+                else {
+                    outPropertyType = propertyType.toTypeName()
+                    outPropertyTypeConstructor = null
+                }
             }
             else {
                 val outputBindingName: String = KotuleExtensionBinderConstants.getOutputBindingName(propertyType.toClassName().simpleName)
-                outPropertyType = scope.generateNew(scope.resolveInPackage(outputBindingName)) {
-                    file.addType(KotuleBindingClassGenerator(this).generate(outputBindingName, propertyType.declaration as KSClassDeclaration)!!)
-                }
+                outPropertyType =
+                    scope.generateNew(scope.resolveInPackage(outputBindingName)) {
+                        file.addType(KotuleBindingClassGenerator(this).generate(outputBindingName, propertyType.declaration as KSClassDeclaration)!!)
+                    }
+                outPropertyTypeConstructor = outputBindingName
             }
 
             addProperty(
-                PropertySpec.builder(property.simpleName.asString(), outPropertyType.copy(nullable = propertyType.isMarkedNullable))
+                PropertySpec.builder(propertyName, outPropertyType.copy(nullable = propertyType.isMarkedNullable))
                     .apply {
-                        property.getter?.also { getter ->
-                            getter(
-                                FunSpec.getterBuilder()
-                                    .addCode(
-                                        buildString {
-                                            append("return ")
+                        getter(
+                            FunSpec.getterBuilder()
+                                .addCode(
+                                    buildString {
+                                        append("return ")
+                                        if (outPropertyTypeConstructor == null) {
+                                            append("$instanceName.$propertyName")
+                                        }
+                                        else {
+                                            append("$instanceName.$propertyName")
+                                            if (propertyType.isMarkedNullable) {
+                                                append('?')
+                                            }
+                                            append(".let {\n$outPropertyTypeConstructor(")
+
                                             if (isPrimitive) {
-                                                append("$instanceName.${property.simpleName.asString()}")
+                                                append("it")
+
+                                                if (LIST_TYPES.contains(propertyType.toClassName().canonicalName)) {
+                                                    val listItemType: KSType = propertyType.arguments.single().type!!.resolve()
+                                                    val listItemIsPrimitive: Boolean = PRIMITIVE_TYPES.contains(listItemType.toClassName().canonicalName)
+
+                                                    append(".map { ")
+                                                    if (listItemIsPrimitive) {
+                                                        append(outPropertyTypeConstructor)
+                                                        append("(it)")
+                                                    }
+                                                    else {
+                                                        append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
+                                                        append('(')
+                                                        appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+                                                        append(')')
+                                                    }
+                                                    append(" }")
+                                                }
+
                                             }
                                             else {
-                                                append("$instanceName.${property.simpleName.asString()}")
-                                                if (propertyType.isMarkedNullable) {
-                                                    append('?')
-                                                }
-                                                append(".let {\n${outPropertyType.simpleName}(")
-
                                                 val params: List<KSValueParameter> = (propertyType.declaration as KSClassDeclaration).primaryConstructor?.parameters.orEmpty()
                                                 appendParameters(params) { "it.$it" }
-                                                append(")\n}")
                                             }
+                                            append(")\n}")
                                         }
-                                    )
-                                    .build()
-                            )
-                        }
+                                    }
+                                )
+                                .build()
+                        )
                     }
                     .build()
             )
@@ -203,14 +246,17 @@ internal class KotuleBindingClassGenerator(
                         scope.import("dev.toastbits.kotules.extension", kotulePromiseName)
                         append("return $kotulePromiseName { ")
 
-                        scope.import(OutValue::class)
-
                         val returnType: KSType = function.returnType!!.resolve()
                         val returnTypeDeclaration: KSClassDeclaration = returnType.declaration as KSClassDeclaration
                         val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(returnType.toClassName().canonicalName)
 
                         if (isPrimitive) {
-                            append("${OutValue::class.simpleName!!}(")
+                            val outValue: (Any) -> Any = ::OutValue
+                            val outValueName: String = (outValue as KCallable<*>).name
+
+                            scope.import("dev.toastbits.kotules.extension.type", outValueName)
+                            append("$outValueName(")
+
                             append("$instanceName.${function.simpleName.asString()}(")
                             for ((index, parameter) in function.parameters.withIndex()) {
                                 append(parameter.name!!.asString())
@@ -218,7 +264,27 @@ internal class KotuleBindingClassGenerator(
                                     append(", ")
                                 }
                             }
-                            append("))\n}")
+                            append(')')
+
+                            if (LIST_TYPES.contains(returnType.toClassName().canonicalName)) {
+                                val listItemType: KSType = returnType.arguments.single().type!!.resolve()
+                                val listItemIsPrimitive: Boolean = PRIMITIVE_TYPES.contains(listItemType.toClassName().canonicalName)
+
+                                append(".map { ")
+                                if (listItemIsPrimitive) {
+                                    append(outValueName)
+                                    append("(it)")
+                                }
+                                else {
+                                    append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
+                                    append('(')
+                                    appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+                                    append(')')
+                                }
+                                append(" }")
+                            }
+
+                            append(")\n}")
                         }
                         else {
                             val outputBindingName: String = KotuleExtensionBinderConstants.getOutputBindingName(returnType.toClassName().simpleName)

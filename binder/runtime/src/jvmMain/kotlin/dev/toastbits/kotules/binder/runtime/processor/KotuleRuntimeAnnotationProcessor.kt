@@ -44,8 +44,14 @@ internal class KotuleRuntimeAnnotationProcessor(
 
         for (kotuleInterface in kotuleInterfaces) {
             validateKotuleClass(kotuleInterface)
-            generateClassBindings(kotuleInterface)
-            generateLoaderInstanceExtension(kotuleInterface)
+
+            try {
+                generateClassBindings(kotuleInterface)
+                generateLoaderInstanceExtension(kotuleInterface)
+            }
+            catch (e: Throwable) {
+                logger.error(e.stackTraceToString(), kotuleInterface)
+            }
         }
 
         fileGenerator.writeToDisk()
