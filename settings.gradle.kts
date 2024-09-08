@@ -3,7 +3,18 @@
 pluginManagement {
     includeBuild("build-logic")
 
+    resolutionStrategy {
+        eachPlugin {
+            for (plugin in listOf("interface", "implementation")) {
+                if (requested.id.id == "dev.toastbits.kotules.plugin.$plugin") {
+                    useModule("dev.toastbits.kotules.plugin.$plugin:dev.toastbits.kotules.plugin.$plugin.gradle.plugin:${requested.version}")
+                }
+            }
+        }
+    }
+
     repositories {
+        mavenLocal()
         gradlePluginPortal()
         google()
         mavenCentral()
@@ -12,6 +23,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         gradlePluginPortal()
         google()
         mavenCentral()
@@ -19,8 +31,10 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Kotules"
+
 include(":extension")
 include(":runtime")
+include(":plugin")
 include(":binder:extension")
 include(":binder:core")
 include(":binder:runtime")

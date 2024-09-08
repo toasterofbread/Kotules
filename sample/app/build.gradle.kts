@@ -1,13 +1,13 @@
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import util.configureAllComposeTargets
 
 plugins {
     id("android-application-conventions")
     id("compose-conventions")
 
+    id("dev.toastbits.kotules.plugin.interface")
+
     alias(libs.plugins.kotlin)
-    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -20,17 +20,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(projects.runtime)
                 implementation(libs.ktor.core)
-            }
-
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/commonMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/commonMain")
-        }
-
-        val commonTest by getting {
-            dependencies {
-                implementation(projects.sample.extension)
             }
         }
 
@@ -38,35 +28,13 @@ kotlin {
             dependencies {
                 runtimeOnly(libs.ktor.client.cio)
             }
-
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/jvmMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/jvmMain")
         }
 
-        val webMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/webMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/webMain")
+        val commonTest by getting {
+            dependencies {
+                implementation(projects.sample.extension)
+            }
         }
-
-        val wasmJsMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/wasmJsMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/wasmJsMain")
-        }
-
-        val jsMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/jsMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/jsMain")
-        }
-    }
-}
-
-dependencies {
-    add("kspCommonMainMetadata", projects.binder.runtime)
-}
-
-project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
-    if (name != "kspCommonMainKotlinMetadata") {
-        dependsOn("kspCommonMainKotlinMetadata")
     }
 }
 

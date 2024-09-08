@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import util.configureAllComposeTargets
 import util.libCatalog
 import util.version
@@ -8,8 +7,9 @@ plugins {
     id("android-library-conventions")
     id("kmp-conventions")
 
+    id("dev.toastbits.kotules.plugin.implementation")
+
     alias(libs.plugins.kotlin)
-    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -29,39 +29,6 @@ kotlin {
                 // https://github.com/Kotlin/kotlinx.coroutines/issues/3874#issuecomment-2130428084
                 implementation(devNpm("string-replace-loader", libCatalog.version("npm.string_replace_loader")))
             }
-
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/commonMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/commonMain")
         }
-
-        val jvmMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/jvmMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/jvmMain")
-        }
-
-        val webMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/webMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/webMain")
-        }
-
-        val wasmJsMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/wasmJsMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/wasmJsMain")
-        }
-
-        val jsMain by getting {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin/jsMain")
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/resources/jsMain")
-        }
-    }
-}
-
-dependencies {
-    add("kspCommonMainMetadata", projects.binder.extension)
-}
-
-project.tasks.withType(KotlinCompilationTask::class.java).configureEach {
-    if (name != "kspCommonMainKotlinMetadata") {
-        dependsOn("kspCommonMainKotlinMetadata")
     }
 }

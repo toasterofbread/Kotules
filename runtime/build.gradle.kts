@@ -28,7 +28,7 @@ kotlin {
 }
 
 val projectName: String = libs.versions.project.name.get()
-val projectVersion: String = project.libs.versions.project.name.get()
+val projectVersion: String = libs.versions.project.version.name.get()
 
 mavenPublishing {
     coordinates("dev.toastbits.$projectName", "runtime", projectVersion)

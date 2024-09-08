@@ -1,6 +1,6 @@
 [versions]
 project-name = "kotules"
-project-version = "0.0.1"
+project-version-name = "0.0.1"
 project-version-inc = "1"
 android-sdk-compile = "34"
 android-sdk-target = "34"
@@ -13,8 +13,9 @@ vanniktech-publish = "0.29.0"
 ktor = "3.0.0-beta-2"
 androidx-activity-compose = "1.9.2"
 kotlinx-coroutines = "1.9.0-RC.2"
-ksp = "2.0.20-1.0.24"
+ksp = "2.0.20-1.0.25"
 poet = "1.18.1"
+gradle-plugin-publish = "1.2.2"
 
 npm-string_replace_loader = "3.1.0"
 
@@ -22,7 +23,6 @@ mokkery = "2.3.0"
 assertk = "0.28.1"
 
 [libraries]
-kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 agp = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 compose-plugin = { module = "org.jetbrains.compose:org.jetbrains.compose.gradle.plugin", version.ref = "compose" }
 kotlin-compose-plugin = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
@@ -35,6 +35,9 @@ ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.re
 poet = { module = "com.squareup:kotlinpoet", version.ref = "poet" }
 poet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "poet" }
 
+kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+ksp-plugin = { module = "com.google.devtools.ksp:symbol-processing-gradle-plugin", version.ref = "ksp" }
+
 mokkery-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
 assertk = { module = "com.willowtreeapps.assertk:assertk", version.ref = "assertk" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
@@ -45,3 +48,4 @@ publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktech-publi
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+gradle-plugin-publish = { id = "com.gradle.plugin-publish", version.ref = "gradle-plugin-publish" }
