@@ -5,9 +5,8 @@ plugins {
     id("android-application-conventions")
     id("compose-conventions")
 
-    id("dev.toastbits.kotules.plugin.interface")
-
     alias(libs.plugins.kotlin)
+    alias(libs.plugins.kotules.declaration)
 }
 
 kotlin {

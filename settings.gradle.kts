@@ -5,7 +5,7 @@ pluginManagement {
 
     resolutionStrategy {
         eachPlugin {
-            for (plugin in listOf("interface", "implementation")) {
+            for (plugin in listOf("declaration", "definition")) {
                 if (requested.id.id == "dev.toastbits.kotules.plugin.$plugin") {
                     useModule("dev.toastbits.kotules.plugin.$plugin:dev.toastbits.kotules.plugin.$plugin.gradle.plugin:${requested.version}")
                 }

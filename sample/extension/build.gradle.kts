@@ -7,9 +7,8 @@ plugins {
     id("android-library-conventions")
     id("kmp-conventions")
 
-    id("dev.toastbits.kotules.plugin.implementation")
-
     alias(libs.plugins.kotlin)
+    alias(libs.plugins.kotules.definition)
 }
 
 kotlin {

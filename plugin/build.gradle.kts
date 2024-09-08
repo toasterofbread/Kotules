@@ -12,19 +12,19 @@ gradlePlugin {
     website = "https://github.com/toasterofbread/Kotules"
     vcsUrl = "https://github.com/toasterofbread/Kotules.git"
     plugins {
-        create("kotules-interface") {
-            id = "dev.toastbits.kotules.plugin.interface"
+        create("kotules-declaration") {
+            id = "dev.toastbits.kotules.plugin.declaration"
             displayName = "Kotules"
             description = "TODO"
             tags = listOf("kmp", "multiplatform")
-            implementationClass = "dev.toastbits.kotules.plugin.KotulesInterfacePlugin"
+            implementationClass = "dev.toastbits.kotules.plugin.KotulesDeclarationPlugin"
         }
-        create("kotules-implementation") {
-            id = "dev.toastbits.kotules.plugin.implementation"
+        create("kotules-definition") {
+            id = "dev.toastbits.kotules.plugin.definition"
             displayName = "Kotules"
             description = "TODO"
             tags = listOf("kmp", "multiplatform")
-            implementationClass = "dev.toastbits.kotules.plugin.KotulesImplementationPlugin"
+            implementationClass = "dev.toastbits.kotules.plugin.KotulesDefinitionPlugin"
         }
     }
 }

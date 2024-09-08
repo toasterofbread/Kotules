@@ -47,5 +47,6 @@ kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktech-publish" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-application = { id = "com.android.application", version.ref = "agp" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 gradle-plugin-publish = { id = "com.gradle.plugin-publish", version.ref = "gradle-plugin-publish" }
+kotules-declaration = { id = "dev.toastbits.kotules.plugin.declaration", version.ref = "project-version-name" }
+kotules-definition = { id = "dev.toastbits.kotules.plugin.definition", version.ref = "project-version-name" }
