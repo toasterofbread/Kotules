@@ -4,6 +4,7 @@ import com.google.devtools.ksp.gradle.KspGradleSubplugin
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.UnknownDomainObjectException
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
@@ -24,12 +25,16 @@ abstract class KotulePluginBase: Plugin<Project> {
 
         project.afterEvaluate {
             project.kotlinExtension.sourceSets.apply {
-                val sourceSets = listOf("common", "jvm", "wasmJs", "js") + KmpTarget.GROUPS.keys
+                val sourceSets: List<String> = listOf("common", "jvm", "wasmJs", "js") + KmpTarget.GROUPS.keys
                 for (sourceSet in sourceSets.map { it + "Main" }) {
-                    getByName(sourceSet).kotlin.srcDirs(
-                        "build/generated/ksp/metadata/commonMain/kotlin/$sourceSet",
-                        "build/generated/ksp/metadata/commonMain/resources/$sourceSet"
-                    )
+
+                    try {
+                        getByName(sourceSet).kotlin.srcDirs(
+                            "build/generated/ksp/metadata/commonMain/kotlin/$sourceSet",
+                            "build/generated/ksp/metadata/commonMain/resources/$sourceSet"
+                        )
+                    }
+                    catch (_: UnknownDomainObjectException) {}
                 }
             }
         }

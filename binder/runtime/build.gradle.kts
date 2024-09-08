@@ -17,6 +17,7 @@ kotlin {
             dependencies {
                 implementation(projects.binder.core)
                 implementation(projects.runtime)
+                implementation(projects.extension)
                 implementation(libs.ksp.api)
                 implementation(libs.poet)
                 implementation(libs.poet.ksp)

@@ -15,13 +15,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(projects.extension)
-            }
-        }
-
-        val jvmMain by getting {
-            dependencies {
-//                implementation(kotlin("reflect"))
+                implementation(projects.extension)
             }
         }
     }
