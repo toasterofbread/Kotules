@@ -5,7 +5,7 @@ import dev.toastbits.kotules.runtime.annotation.KotuleAnnotation
 
 @KotuleAnnotation
 interface SampleKotule: Kotule {
-    val coolProperty: Int
+    val intProperty: Int
     fun repeatInput(input: String, repeatCount: Int): String
 
     suspend fun getList(): List<SampleDataClass> =

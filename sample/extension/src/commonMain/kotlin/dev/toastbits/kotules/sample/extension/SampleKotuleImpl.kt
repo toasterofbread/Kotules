@@ -13,7 +13,7 @@ import kotlin.coroutines.coroutineContext
 @KotuleImplementationAnnotation
 @Suppress("JS_NAME_CLASH") // TODO
 class SampleKotuleImpl: SampleKotule {
-    override val coolProperty: Int = 56
+    override val intProperty: Int = 56
 
     override fun repeatInput(input: String, repeatCount: Int): String =
         input.repeat(repeatCount)

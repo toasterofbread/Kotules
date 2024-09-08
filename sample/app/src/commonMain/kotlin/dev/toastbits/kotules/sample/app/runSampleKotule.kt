@@ -8,9 +8,9 @@ suspend fun runSampleKotule() {
     val repeatResult: String = kotule.repeatInput("Hello", 5)
     println("Got result from repeatInput: $repeatResult")
 
-    println("Getting coolProperty from SampleKotule")
-    val coolProperty: Int = kotule.coolProperty
-    println("Got coolProperty: $coolProperty")
+    println("Getting intProperty from SampleKotule")
+    val intProperty: Int = kotule.intProperty
+    println("Got intProperty: $intProperty")
 
     println("Calling suspendInt() on SampleKotule")
     val intResult: Int = kotule.suspendInt()

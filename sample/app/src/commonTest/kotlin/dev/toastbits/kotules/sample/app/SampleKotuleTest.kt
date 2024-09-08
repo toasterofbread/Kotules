@@ -6,23 +6,41 @@ import assertk.assertions.isFalse
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isNotEqualTo
 import dev.toastbits.kotules.sample.extension.SampleKotuleImpl
-import kotlinx.coroutines.test.runTest
-import kotlin.test.BeforeTest
+import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
 
 class SampleKotuleTest {
     private lateinit var referenceKotule: SampleKotule
     private lateinit var loadedKotule: SampleKotule
 
-    @BeforeTest
-    fun setUp() = runTest {
+    private suspend fun setUp() {
         referenceKotule = SampleKotuleImpl()
         loadedKotule = loadSampleKotule()
     }
 
+    private fun runTest(block: suspend TestScope.() -> Unit) {
+        kotlinx.coroutines.test.runTest {
+            setUp()
+            block()
+        }
+    }
+
     @Test
-    fun coolProperty_valueMatches() = runTest {
-        assertThat(loadedKotule.coolProperty).isEqualTo(referenceKotule.coolProperty)
+    fun intProperty_valueMatches() = runTest {
+        assertThat(loadedKotule.intProperty).isEqualTo(referenceKotule.intProperty)
+    }
+
+    @Test
+    fun suspendInt_valueMatches() = runTest {
+        assertThat(loadedKotule.suspendInt()).isEqualTo(referenceKotule.suspendInt())
+    }
+
+    @Test
+    fun downloadFortune_resultDoesNotMatch() = runTest {
+        val fortune: String = loadedKotule.downloadFortune()
+        assertThat(fortune).isNotEmpty()
+        assertThat(fortune.isBlank()).isFalse()
+        assertThat(fortune).isNotEqualTo(referenceKotule.downloadFortune())
     }
 
     @Test
@@ -35,10 +53,7 @@ class SampleKotuleTest {
     }
 
     @Test
-    fun downloadFortune_resultDoesNotMatch() = runTest {
-        val fortune: String = loadedKotule.downloadFortune()
-        assertThat(fortune).isNotEmpty()
-        assertThat(fortune.isBlank()).isFalse()
-        assertThat(fortune).isNotEqualTo(referenceKotule.downloadFortune())
+    fun getDataClass_resultMatches() = runTest {
+        assertThat(loadedKotule.getDataClass()).isEqualTo(referenceKotule.getDataClass())
     }
 }
