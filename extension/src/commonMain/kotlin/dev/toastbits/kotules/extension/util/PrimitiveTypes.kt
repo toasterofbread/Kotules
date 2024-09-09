@@ -5,12 +5,15 @@ import kotlin.reflect.KClass
 
 val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
     listOf(
-        String::class,
+        Boolean::class,
         Int::class,
+        String::class,
         List::class,
         EmptyList::class,
         ArrayList::class,
-        Function::class
+        Set::class,
+        EmptySet::class,
+        Function::class,
     )
 
 val LIST_TYPES: List<String> =
@@ -24,6 +27,7 @@ val LIST_TYPES: List<String> =
 
 val PRIMITIVE_TYPES: List<String> =
     listOf(
-        "kotlin.String",
+        "kotlin.Boolean",
         "kotlin.Int",
+        "kotlin.String",
     ) + LIST_TYPES

@@ -7,7 +7,9 @@ import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSName
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.AnnotationSpec
@@ -34,7 +36,7 @@ import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.runtime.KotuleInputBinding
 
 private fun FileGenerator.Scope.getInteropTypeFor(type: KSType, canBePrimitive: Boolean = false): TypeName {
-    val canonicalName: String = type.toClassName().canonicalName
+    val canonicalName: String = type.resolveTypeAlias()
     if (canBePrimitive && PRIMITIVE_TYPES.contains(canonicalName) && !LIST_TYPES.contains(canonicalName)) {
         return type.toTypeName()
     }
@@ -56,6 +58,14 @@ private fun FileGenerator.Scope.getInteropTypeFor(type: KSType, canBePrimitive: 
             file.addType(it)
         }
     }
+}
+
+private fun KSType.resolveTypeAlias(): String {
+    var declaration: KSDeclaration = declaration
+    while (declaration is KSTypeAlias) {
+        declaration = declaration.type.resolve().declaration
+    }
+    return declaration.qualifiedName!!.asString()
 }
 
 private fun FileGenerator.Scope.getFunctionInteropType(type: KSType): TypeName =
@@ -96,7 +106,7 @@ internal class KotuleBindingInterfaceGenerator(
 
             if (kotuleInterface.classKind == ClassKind.CLASS) {
                 addProperties(
-                    kotuleInterface.primaryConstructor!!.parameters.associate { it.name!!.asString() to it.type.resolve() },
+                    kotuleInterface.primaryConstructor?.parameters.orEmpty().associate { it.name!!.asString() to it.type.resolve() },
                     expectationModifier
                 )
             }

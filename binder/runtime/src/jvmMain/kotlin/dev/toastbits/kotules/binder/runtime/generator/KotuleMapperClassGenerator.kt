@@ -71,7 +71,7 @@ internal class KotuleMapperClassGenerator(
                         }
                     }
                     .addModifiers(KModifier.OVERRIDE)
-                    .addModifiers(property.modifiers.mapNotNull { it.toKModifier() })
+//                    .addModifiers(property.modifiers.mapNotNull { it.toKModifier() })
                     .build()
             )
         }
@@ -96,11 +96,11 @@ internal class KotuleMapperClassGenerator(
         FunSpec.builder(function.simpleName.asString())
             .apply {
                 addModifiers(KModifier.OVERRIDE)
-                addModifiers(
-                    function.modifiers
-                        .filter { it != Modifier.SUSPEND }
-                        .mapNotNull { it.toKModifier() }
-                )
+//                addModifiers(
+//                    function.modifiers
+//                        .filter { it != Modifier.SUSPEND }
+//                        .mapNotNull { it.toKModifier() }
+//                )
 
                 function.returnType?.also { returnType ->
                     returns(returnType.toTypeName())
