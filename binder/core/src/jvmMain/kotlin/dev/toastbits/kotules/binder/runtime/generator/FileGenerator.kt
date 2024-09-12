@@ -82,6 +82,28 @@ class FileGenerator(
             if (groupFound) {
                 continue
             }
+            
+            for ((groupName, groupTargets) in KmpTarget.GROUPS) {
+                var file: FileSpec? = null
+                for (target in groupTargets) {
+                    val targetFile: FileSpec? = targets[target]
+                    if (targetFile == null || (file != null && file != targetFile)) {
+                        file = null
+                        break
+                    }
+                    file = targetFile
+                }
+
+                if (file != null) {
+                    writeFile(file, location, KmpTarget.COMMON, groupName)
+                    groupFound = true
+                    break
+                }
+            }
+
+            if (groupFound) {
+                continue
+            }
 
             for ((target, file) in targets) {
                 writeFile(file!!, location, target)
@@ -133,7 +155,7 @@ class FileGenerator(
                 )
             }
             catch (e: Throwable) {
-                throw RuntimeException("$location | $target | $commonGroupName", e)
+                throw RuntimeException("$log\n\n$location | $target | $commonGroupName", e)
             }
 
         OutputStreamWriter(file, StandardCharsets.UTF_8).use(fileSpec::writeTo)

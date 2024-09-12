@@ -13,7 +13,14 @@ import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.extension.util.LIST_TYPES
 
 internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): TypeName? {
-    val className: String = this.toClassName().toString()
+    val className: String =
+        try {
+            this.toClassName().toString()
+        }
+        catch (_: Throwable) {
+            return null
+        }
+
     when (className) {
         "kotlin.Boolean" -> return getValueClassName("BooleanValue")
         "kotlin.Int" -> return getValueClassName("IntValue")

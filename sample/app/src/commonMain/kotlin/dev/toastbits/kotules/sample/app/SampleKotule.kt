@@ -8,22 +8,31 @@ interface SampleKotule: Kotule {
     val intProperty: Int
     fun repeatInput(input: String, repeatCount: Int): String
 
-    suspend fun getList(): List<SampleDataClass> =
-        listOf(
-            SampleDataClass("one", SampleDataClass("1.1", SampleDataClass("1.2", null))),
-            SampleDataClass("two", null, listOf(5, 6, 7, 8)),
-            SampleDataClass("three", null, listOf(9, 10, 11, 12, 13))
-        )
+    fun getImpl(): LogEntity
+
+//    suspend fun getList(): List<SampleDataClass<LogEntity>> =
+//        listOf(
+//            SampleDataClass("name one") { PropertyContent.Text("Ello") },
+//            SampleDataClass("name two") { PropertyContent.Text("Ello") },
+//            SampleDataClass("name three") { PropertyContent.Text("Ello") }
+//        )
 
     suspend fun suspendInt(): Int
 
     suspend fun downloadFortune(): String
 
-    suspend fun getDataClass(): SampleDataClass
+//    suspend fun getDataClass(): SampleDataClass<LogEntity>
 }
+//
+//data class SampleDataClass<T: LogEntity>(
+//    val name: String,
+//    val accessor: T.() -> PropertyContent
+//)
+//
+//sealed interface PropertyContent {
+//    data class Text(val text: String): PropertyContent
+//}
 
-data class SampleDataClass(
-    val stringValue: String,
-    val dataValue: SampleDataClass?,
-    val list: List<Int> = emptyList()
-)
+interface LogEntity {
+    fun doSomething(): String
+}

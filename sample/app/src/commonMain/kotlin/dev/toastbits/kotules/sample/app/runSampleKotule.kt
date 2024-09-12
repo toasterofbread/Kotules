@@ -4,6 +4,8 @@ suspend fun runSampleKotule() {
     val kotule: SampleKotule = loadSampleKotule()
     println("Loaded SampleKotule: $kotule")
 
+    TODO(kotule.getImpl().doSomething())
+
     println("Calling repeatInput(\"Hello \", 5) on SampleKotule")
     val repeatResult: String = kotule.repeatInput("Hello", 5)
     println("Got result from repeatInput: $repeatResult")
@@ -16,13 +18,13 @@ suspend fun runSampleKotule() {
     val intResult: Int = kotule.suspendInt()
     println("Got result from downloadFortune: $intResult")
 
-    println("Calling getDataClass() on SampleKotule")
-    val dataClassResult: SampleDataClass = kotule.getDataClass()
-    println("Got result from getDataClass: $dataClassResult")
-
-    println("Calling getList() on SampleKotule")
-    val listResult: List<SampleDataClass> = kotule.getList()
-    println("Got result from getList: $listResult")
+//    println("Calling getDataClass() on SampleKotule")
+//    val dataClassResult: SampleDataClass = kotule.getDataClass()
+//    println("Got result from getDataClass: $dataClassResult")
+//
+//    println("Calling getList() on SampleKotule")
+//    val listResult: List<SampleDataClass> = kotule.getList()
+//    println("Got result from getList: $listResult")
 
     println("Calling downloadFortune() on SampleKotule")
     val fortuneResult: String = kotule.downloadFortune()

@@ -72,7 +72,7 @@ internal class KotuleMapperClassGenerator(
                                 FunSpec.getterBuilder()
                                     .addCode(buildString {
                                         append("return $instanceName.${property.simpleName.asString()}")
-                                        append(getPropertyOrFunctionValueTransformSuffix(property.type.resolve()))
+                                        append(getPropertyOrFunctionValueTransformSuffix(property.type.resolve(), true))
                                     })
                                     .build()
                             )
@@ -131,7 +131,7 @@ internal class KotuleMapperClassGenerator(
                         append(')')
 
                         if (returnType != null) {
-                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve()))
+                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), true))
                         }
                     }
                 )
@@ -169,7 +169,7 @@ internal class KotuleMapperClassGenerator(
                         append(").$awaitName()")
 
                         if (returnType != null) {
-                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve()))
+                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), false))
                         }
                     }
                 )
@@ -211,7 +211,7 @@ internal class KotuleMapperClassGenerator(
             append('(')
             for (arg in 0 until argCount) {
                 append("$argumentPrefix$arg")
-                append(getPropertyOrFunctionValueTransformSuffix(type.arguments[arg].type!!.resolve()))
+                append(getPropertyOrFunctionValueTransformSuffix(type.arguments[arg].type!!.resolve(), true))
 
                 if (arg + 1 != argCount) {
                     append(", ")
@@ -224,7 +224,7 @@ internal class KotuleMapperClassGenerator(
         }
     }
 
-    private fun getPropertyOrFunctionValueTransformSuffix(type: KSType): String = buildString {
+    private fun getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
         if (type.declaration.shouldBeSerialsied()) {
             val kotulesJsonInstance: String = (::kotulesJsonInstance).name
             scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
@@ -237,7 +237,7 @@ internal class KotuleMapperClassGenerator(
             scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
             append(".getListValue().map { it.value }")
         }
-        else if (!PRIMITIVE_TYPES.contains(qualifiedName)) {
+        else if (!canBePrimitive || !PRIMITIVE_TYPES.contains(qualifiedName)) {
             append(".value")
         }
     }

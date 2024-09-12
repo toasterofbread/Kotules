@@ -1,10 +1,8 @@
-@file:OptIn(KspExperimental::class)
-
 package dev.toastbits.kotules.binder.runtime.generator
 
-import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -25,7 +23,6 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
-import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
@@ -33,8 +30,8 @@ import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
-import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.core.type.ValueType
+import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.util.LIST_TYPES
 import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.runtime.KotuleInputBinding
@@ -56,7 +53,7 @@ private fun FileGenerator.Scope.getInteropTypeFor(type: KSType, canBePrimitive: 
     }
 
     val declaration: KSDeclaration = type.declaration
-    check(declaration is KSClassDeclaration) { declaration }
+    check(declaration is KSClassDeclaration) { "$declaration (${declaration::class})" }
 
     val typeClass: ClassName = resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
     log("Generating input interop type for $type (${type.toClassName()})")
@@ -104,30 +101,51 @@ internal class KotuleBindingInterfaceGenerator(
                 )
             }
 
-            if (kotuleInterface.classKind == ClassKind.CLASS) {
+            if (kotuleInterface.isAbstract()) {
                 addProperties(
-                    kotuleInterface.primaryConstructor?.parameters.orEmpty().associate { it.name!!.asString() to it.type.resolve() },
+                    kotuleInterface.getDeclaredProperties().associate { it.simpleName.asString() to it.type.resolve() },
+                    expectationModifier
+                )
+                addFunctions(
+                    kotuleInterface.getDeclaredFunctions(),
                     expectationModifier
                 )
             }
             else {
                 addProperties(
-                    kotuleInterface.getDeclaredProperties().associate { it.simpleName.asString() to it.type.resolve() },
+                    kotuleInterface.primaryConstructor?.parameters.orEmpty().associate { it.name!!.asString() to it.type.resolve() },
                     expectationModifier
                 )
-                addFunctions(kotuleInterface.getDeclaredFunctions(), expectationModifier)
             }
 
-            if (scope.target == KmpTarget.COMMON) {
-                scope.file.addProperty(
-                    PropertySpec.builder("value", kotuleInterface.toClassName())
-                        .addModifiers(KModifier.INTERNAL)
-                        .receiver(scope.resolveInPackage(name))
-                        .getter(
-                            FunSpec.getterBuilder()
-                                .addCode(buildString {
-                                    append("return ")
-                                    append(kotuleInterface.toClassName().simpleName)
+            if (kotuleInterface.classKind == ClassKind.INTERFACE) {
+                val mapperName: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface))
+                scope.generateNew(mapperName) {
+                    KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
+                        this@generateNew.file.addType(it)
+                    }
+                }
+            }
+
+            if (scope.target != KmpTarget.COMMON) {
+                return@apply
+            }
+
+            scope.file.addProperty(
+                PropertySpec.builder("value", kotuleInterface.toClassName())
+                    .addModifiers(KModifier.INTERNAL)
+                    .receiver(scope.resolveInPackage(name))
+                    .getter(
+                        FunSpec.getterBuilder()
+                            .addCode(buildString {
+                                append("return ")
+
+                                if (kotuleInterface.classKind == ClassKind.INTERFACE) {
+                                    append(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface))
+                                    append("(this)")
+                                }
+                                else {
+                                    append(kotuleInterface.toClassName().run { canonicalName.removePrefix(packageName + ".") })
                                     append('(')
                                     val params: List<KSValueParameter> = kotuleInterface.primaryConstructor?.parameters.orEmpty()
                                     for ((index, param) in params.withIndex()) {
@@ -152,21 +170,12 @@ internal class KotuleBindingInterfaceGenerator(
                                         }
                                     }
                                     append(')')
-                                })
-                                .build()
-                        )
-                        .build()
-                )
-            }
-
-            if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                val mapperName: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface))
-                scope.generateNew(mapperName) {
-                    KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
-                        this@generateNew.file.addType(it)
-                    }
-                }
-            }
+                                }
+                            })
+                            .build()
+                    )
+                    .build()
+            )
         }.build()
 
     private fun TypeSpec.Builder.addProperties(
@@ -200,12 +209,12 @@ internal class KotuleBindingInterfaceGenerator(
                 FunSpec.builder(function.simpleName.asString())
                     .apply {
                         addModifiers(expectationModifier, KModifier.ABSTRACT)
-                        addModifiers(
-                            function
-                                .modifiers
-                                .filter { it != Modifier.SUSPEND && it != Modifier.OVERRIDE }
-                                .mapNotNull { it.toKModifier() }
-                        )
+//                        addModifiers(
+//                            function
+//                                .modifiers
+//                                .filter { it != Modifier.SUSPEND && it != Modifier.OVERRIDE }
+//                                .mapNotNull { it.toKModifier() }
+//                        )
 
                         val returnType: KSType? = function.returnType?.resolve()
                         if (function.modifiers.contains(Modifier.SUSPEND)) {
