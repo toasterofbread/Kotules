@@ -6,6 +6,7 @@ import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
@@ -19,10 +20,14 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
+import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
+import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.type.ValueType
 import dev.toastbits.kotules.extension.util.LIST_TYPES
+import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
+import dev.toastbits.kotules.extension.util.kotulesJsonInstance
 
 internal class KotuleMapperClassGenerator(
     private val scope: FileGenerator.Scope
@@ -65,7 +70,10 @@ internal class KotuleMapperClassGenerator(
                         property.getter?.also { getter ->
                             getter(
                                 FunSpec.getterBuilder()
-                                    .addCode("return $instanceName.${property.simpleName.asString()}")
+                                    .addCode(buildString {
+                                        append("return $instanceName.${property.simpleName.asString()}")
+                                        append(getPropertyOrFunctionValueTransformSuffix(property.type.resolve()))
+                                    })
                                     .build()
                             )
                         }
@@ -95,6 +103,8 @@ internal class KotuleMapperClassGenerator(
     private fun generateNonSuspendFunction(function: KSFunctionDeclaration): FunSpec =
         FunSpec.builder(function.simpleName.asString())
             .apply {
+                val returnType: KSTypeReference? = function.returnType
+
                 addModifiers(KModifier.OVERRIDE)
 //                addModifiers(
 //                    function.modifiers
@@ -102,7 +112,7 @@ internal class KotuleMapperClassGenerator(
 //                        .mapNotNull { it.toKModifier() }
 //                )
 
-                function.returnType?.also { returnType ->
+                if (returnType != null) {
                     returns(returnType.toTypeName())
                 }
 
@@ -112,9 +122,17 @@ internal class KotuleMapperClassGenerator(
 
                 addCode(
                     buildString {
-                        append("return $instanceName.${function.simpleName.asString()}(")
-                        appendParameters(function.parameters)
+                        if (returnType != null) {
+                            append("return ")
+                        }
+
+                        append("$instanceName.${function.simpleName.asString()}(")
+                        appendParameters(function.parameters) { it + getFunctionParameterTransformSuffix(this) }
                         append(')')
+
+                        if (returnType != null) {
+                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve()))
+                        }
                     }
                 )
             }
@@ -147,20 +165,80 @@ internal class KotuleMapperClassGenerator(
                             append("return ")
                         }
                         append("$instanceName.${function.simpleName.asString()}(")
-                        appendParameters(function.parameters)
+                        appendParameters(function.parameters) { it + getFunctionParameterTransformSuffix(this) }
                         append(").$awaitName()")
 
                         if (returnType != null) {
-                            if (LIST_TYPES.contains(returnType.resolve().toClassName().canonicalName)) {
-                                scope.import("dev.toastbits.kotules.extension.type.input", "getListValue")
-                                append(".getListValue().map { it.value }")
-                            }
-                            else {
-                                append(".value")
-                            }
+                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve()))
                         }
                     }
                 )
             }
             .build()
+
+    private fun getFunctionParameterTransformSuffix(type: KSType): String = buildString {
+        if (type.declaration.shouldBeSerialsied()) {
+            val kotulesJsonInstance: String = (::kotulesJsonInstance).name
+            scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
+            scope.import("kotlinx.serialization", "encodeToString")
+
+            append(".let { $kotulesJsonInstance.encodeToString(it) }")
+            return@buildString
+        }
+
+        val canonicalName: String = type.resolveTypeAlias()
+        if (canonicalName.startsWith("kotlin.Function")) {
+            val functionName: String = "lambda"
+            val argumentPrefix: String = "arg"
+
+            append(".let { $functionName -> { ")
+
+            val argCount: Int =
+                if (canonicalName == "kotlin.Function") 0
+                else canonicalName.removePrefix("kotlin.Function").toInt()
+
+            if (argCount > 0) {
+                for (arg in 0 until argCount) {
+                    append("$argumentPrefix$arg")
+                    if (arg + 1 != argCount) {
+                        append(", ")
+                    }
+                }
+                append(" ->")
+            }
+
+            append(functionName)
+            append('(')
+            for (arg in 0 until argCount) {
+                append("$argumentPrefix$arg")
+                append(getPropertyOrFunctionValueTransformSuffix(type.arguments[arg].type!!.resolve()))
+
+                if (arg + 1 != argCount) {
+                    append(", ")
+                }
+            }
+            append(')')
+
+            append(" } }")
+            return@buildString
+        }
+    }
+
+    private fun getPropertyOrFunctionValueTransformSuffix(type: KSType): String = buildString {
+        if (type.declaration.shouldBeSerialsied()) {
+            val kotulesJsonInstance: String = (::kotulesJsonInstance).name
+            scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
+            append(".let { $kotulesJsonInstance.decodeFromString(it) }")
+            return@buildString
+        }
+
+        val qualifiedName: String = type.resolveTypeAlias()
+        if (LIST_TYPES.contains(qualifiedName)) {
+            scope.import("dev.toastbits.kotules.extension.type.input", "getListValue")
+            append(".getListValue().map { it.value }")
+        }
+        else if (!PRIMITIVE_TYPES.contains(qualifiedName)) {
+            append(".value")
+        }
+    }
 }

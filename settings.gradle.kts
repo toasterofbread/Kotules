@@ -39,5 +39,5 @@ include(":binder:extension")
 include(":binder:core")
 include(":binder:runtime")
 
-//include(":sample:app")
-//include(":sample:extension")
+include(":sample:app")
+include(":sample:extension")

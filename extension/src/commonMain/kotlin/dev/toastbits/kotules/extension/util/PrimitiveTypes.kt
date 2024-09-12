@@ -5,6 +5,7 @@ import kotlin.reflect.KClass
 
 val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
     listOf(
+        Unit::class,
         Boolean::class,
         Int::class,
         String::class,
@@ -27,6 +28,7 @@ val LIST_TYPES: List<String> =
 
 val PRIMITIVE_TYPES: List<String> =
     listOf(
+        "kotlin.Unit",
         "kotlin.Boolean",
         "kotlin.Int",
         "kotlin.String",

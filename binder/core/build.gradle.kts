@@ -16,6 +16,7 @@ kotlin {
             dependencies {
                 implementation(libs.ksp.api)
                 implementation(libs.poet)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
     }

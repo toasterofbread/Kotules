@@ -3,7 +3,6 @@ package dev.toastbits.kotules.binder.runtime.generator
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
-import com.google.devtools.ksp.symbol.KSNode
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
@@ -115,9 +114,9 @@ class FileGenerator(
         commonGroupName: String = "common"
     ) {
         val outputPath: String = (
-                if (target == KmpTarget.COMMON) commonGroupName
-                else target.getSourceSetName()
-                ) + "Main." + location.packageName
+            if (target == KmpTarget.COMMON) commonGroupName
+            else target.getSourceSetName()
+        ) + "Main." + location.packageName
 
         val file: OutputStream =
             try {
@@ -144,6 +143,8 @@ class FileGenerator(
         val file: FileSpec.Builder,
         private val packageName: String
     ) {
+        val logger: KSPLogger get() = this@FileGenerator.logger
+
         fun resolveInPackage(name: String): ClassName = ClassName(packageName, name)
 
         fun import(packageName: String, name: String): ClassName {

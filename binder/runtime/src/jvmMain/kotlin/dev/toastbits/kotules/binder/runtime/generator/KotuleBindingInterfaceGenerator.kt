@@ -1,5 +1,8 @@
+@file:OptIn(KspExperimental::class)
+
 package dev.toastbits.kotules.binder.runtime.generator
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
@@ -7,9 +10,7 @@ import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSName
 import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.AnnotationSpec
@@ -22,6 +23,7 @@ import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
@@ -29,6 +31,8 @@ import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
+import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.type.ValueType
 import dev.toastbits.kotules.extension.util.LIST_TYPES
@@ -47,6 +51,10 @@ private fun FileGenerator.Scope.getInteropTypeFor(type: KSType, canBePrimitive: 
         return getFunctionInteropType(type)
     }
 
+    if (type.declaration.shouldBeSerialsied()) {
+        return String::class.asTypeName()
+    }
+
     val declaration: KSDeclaration = type.declaration
     check(declaration is KSClassDeclaration) { declaration }
 
@@ -58,14 +66,6 @@ private fun FileGenerator.Scope.getInteropTypeFor(type: KSType, canBePrimitive: 
             file.addType(it)
         }
     }
-}
-
-private fun KSType.resolveTypeAlias(): String {
-    var declaration: KSDeclaration = declaration
-    while (declaration is KSTypeAlias) {
-        declaration = declaration.type.resolve().declaration
-    }
-    return declaration.qualifiedName!!.asString()
 }
 
 private fun FileGenerator.Scope.getFunctionInteropType(type: KSType): TypeName =
@@ -118,7 +118,7 @@ internal class KotuleBindingInterfaceGenerator(
                 addFunctions(kotuleInterface.getDeclaredFunctions(), expectationModifier)
             }
 
-            if (kotuleInterface.classKind == ClassKind.CLASS && scope.target == KmpTarget.COMMON) {
+            if (scope.target == KmpTarget.COMMON) {
                 scope.file.addProperty(
                     PropertySpec.builder("value", kotuleInterface.toClassName())
                         .addModifiers(KModifier.INTERNAL)
@@ -220,7 +220,13 @@ internal class KotuleBindingInterfaceGenerator(
                         }
 
                         for (parameter in function.parameters) {
-                            addParameter(parameter.name!!.asString(), scope.getInteropTypeFor(parameter.type.resolve(), canBePrimitive = true))
+                            addParameter(
+                                parameter.name!!.asString(),
+                                scope.getInteropTypeFor(
+                                    parameter.type.resolve(),
+                                    canBePrimitive = true
+                                )
+                            )
                         }
                     }
                     .build()
