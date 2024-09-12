@@ -1,7 +1,7 @@
 package dev.toastbits.kotules.runtime
 
-import dev.toastbits.kotules.extension.Kotule
-import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.core.Kotule
+import dev.toastbits.kotules.core.type.ValueType
 
 private external fun eval(code: String)
 

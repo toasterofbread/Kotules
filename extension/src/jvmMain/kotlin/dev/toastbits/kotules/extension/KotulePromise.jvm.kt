@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.extension
 
-import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.core.type.ValueType
 
 actual class KotulePromise<T : ValueType?>(val action: suspend () -> T)
 

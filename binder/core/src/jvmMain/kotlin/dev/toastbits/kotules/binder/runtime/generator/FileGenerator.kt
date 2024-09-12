@@ -31,6 +31,7 @@ class FileGenerator(
         generationScope: Scope.() -> Unit
     ): ClassName {
         val fileLocation: FileLocation = FileLocation(packageName, name)
+        log("generate($fileLocation)")
 
         if (filesToWrite[fileLocation]?.containsKey(target) == true) {
             return ClassName(packageName, name)

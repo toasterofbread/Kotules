@@ -44,4 +44,4 @@ internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): Typ
 }
 
 private fun getValueClassName(name: String): ClassName =
-    ClassName.bestGuess("dev.toastbits.kotules.extension.type.input.$name")
+    ClassName.bestGuess("dev.toastbits.kotules.core.type.input.$name")

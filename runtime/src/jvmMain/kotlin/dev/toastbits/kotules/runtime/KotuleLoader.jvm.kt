@@ -1,7 +1,7 @@
 package dev.toastbits.kotules.runtime
 
-import dev.toastbits.kotules.extension.Kotule
 import java.io.ByteArrayInputStream
+import dev.toastbits.kotules.core.Kotule
 import java.net.URL
 import java.net.URLClassLoader
 import java.util.jar.JarEntry

@@ -20,7 +20,7 @@ import dev.toastbits.kotules.binder.runtime.generator.KotuleBindingInterfaceGene
 import dev.toastbits.kotules.binder.runtime.generator.KotuleLoaderGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
-import dev.toastbits.kotules.extension.Kotule
+import dev.toastbits.kotules.core.Kotule
 import dev.toastbits.kotules.runtime.KotuleLoader
 import dev.toastbits.kotules.runtime.annotation.KotuleDeclaration
 import kotlin.reflect.KClass

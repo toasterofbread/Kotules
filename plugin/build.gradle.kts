@@ -54,6 +54,7 @@ java {
 }
 
 tasks.named("publishToMavenLocal") {
+    dependsOn(":core:publishToMavenLocal")
     dependsOn(":runtime:publishToMavenLocal")
     dependsOn(":extension:publishToMavenLocal")
     dependsOn(":binder:runtime:publishToMavenLocal")

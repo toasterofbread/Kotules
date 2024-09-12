@@ -24,7 +24,7 @@ import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
-import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.core.type.ValueType
 import dev.toastbits.kotules.extension.util.LIST_TYPES
 import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.util.kotulesJsonInstance
@@ -234,7 +234,7 @@ internal class KotuleMapperClassGenerator(
 
         val qualifiedName: String = type.resolveTypeAlias()
         if (LIST_TYPES.contains(qualifiedName)) {
-            scope.import("dev.toastbits.kotules.extension.type.input", "getListValue")
+            scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
             append(".getListValue().map { it.value }")
         }
         else if (!PRIMITIVE_TYPES.contains(qualifiedName)) {

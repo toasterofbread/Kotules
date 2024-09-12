@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.extension
 
-import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.core.type.ValueType
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.await

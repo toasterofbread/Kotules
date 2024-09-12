@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.sample.app
 
-import dev.toastbits.kotules.extension.Kotule
+import dev.toastbits.kotules.core.Kotule
 import dev.toastbits.kotules.runtime.annotation.KotuleDeclaration
 
 @KotuleDeclaration

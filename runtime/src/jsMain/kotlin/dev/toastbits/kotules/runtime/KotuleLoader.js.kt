@@ -1,6 +1,6 @@
 package dev.toastbits.kotules.runtime
 
-import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.core.type.ValueType
 
 internal actual fun <T: ValueType> new(constructor: ValueType): T = js("new constructor()").unsafeCast<T>()
 

@@ -32,6 +32,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Kotules"
 
+include(":core")
 include(":extension")
 include(":runtime")
 include(":plugin")

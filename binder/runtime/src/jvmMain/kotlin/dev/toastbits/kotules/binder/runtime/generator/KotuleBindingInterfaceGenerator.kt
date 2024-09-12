@@ -34,7 +34,7 @@ import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
 import dev.toastbits.kotules.extension.KotulePromise
-import dev.toastbits.kotules.extension.type.ValueType
+import dev.toastbits.kotules.core.type.ValueType
 import dev.toastbits.kotules.extension.util.LIST_TYPES
 import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.runtime.KotuleInputBinding
@@ -140,7 +140,7 @@ internal class KotuleBindingInterfaceGenerator(
                                             append(".value")
                                         }
                                         else if (LIST_TYPES.contains(type.toClassName().canonicalName)) {
-                                            scope.import("dev.toastbits.kotules.extension.type.input", "getListValue")
+                                            scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
                                             if (type.isMarkedNullable) {
                                                 append('?')
                                             }
