@@ -2,7 +2,8 @@ package dev.toastbits.kotules.sample.extension
 
 import dev.toastbits.kotules.extension.annotation.KotuleDefinition
 import dev.toastbits.kotules.extension.util.isDelayAvailable
-import dev.toastbits.kotules.sample.app.LogEntity
+import dev.toastbits.kotules.sample.app.SampleDataClass
+import dev.toastbits.kotules.sample.app.SampleInputInterface
 import dev.toastbits.kotules.sample.app.SampleKotule
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -40,15 +41,24 @@ class SampleKotuleImpl: SampleKotule {
         return fortuneText
     }
 
-//    override suspend fun getDataClass(): SampleDataClass<LogEntity> =
-//        SampleDataClass(
-//            "SampleDataClass string value"
-//        ) { PropertyContent.Text("str") }
+    override suspend fun getDataClass(): SampleDataClass =
+        SampleDataClass(
+            "SampleDataClass string value",
+            SampleDataClass(
+                "string 2",
+                SampleDataClass(
+                    "string 3",
+                    SampleDataClass(
+                        "string 4",
+                        SampleDataClass(
+                            "string 5",
+                            null
+                        )
+                    )
+                )
+            )
+        )
 
-    override fun getImpl(): LogEntityImpl = LogEntityImpl()
-}
-
-class LogEntityImpl: LogEntity {
-    override fun doSomething(): String =
-        "i'm something"
+//    override fun inputTest(input: SampleInputInterface): String =
+//        (input.getText() + " ").repeat(5)
 }

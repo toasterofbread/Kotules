@@ -104,6 +104,18 @@ internal class KotuleBindingClassGenerator(
         else TypeSpec.classBuilder(name).apply {
             val primaryConstructor: KSFunctionDeclaration? = kotuleClass.primaryConstructor
 
+            if (primaryConstructor != null) {
+                primaryConstructor(
+                    FunSpec.constructorBuilder()
+                        .apply {
+                            for (param in primaryConstructor.parameters) {
+                                addParameter(param.name!!.asString(), param.type.toTypeName())
+                            }
+                        }
+                        .build()
+                )
+            }
+
             val instanceType: TypeName =
                 try {
                     kotuleClass.asType(emptyList()).toTypeName()
@@ -112,28 +124,13 @@ internal class KotuleBindingClassGenerator(
                     throw RuntimeException("$name $kotuleClass", e)
                 }
 
-            primaryConstructor(
-                FunSpec.constructorBuilder()
-                    .addParameter(
-                        ParameterSpec.builder(instanceName, instanceType)
-                            .defaultValue(buildString {
-                                append("${kotuleClass.simpleName.asString()}(")
-                                appendParameters(primaryConstructor?.parameters.orEmpty())
-                                append(')')
-                            })
-                            .build()
-                    )
-                    .build()
-            )
-
             addProperty(
                 PropertySpec.builder(instanceName, instanceType)
                     .addModifiers(KModifier.PRIVATE)
                     .initializer(buildString {
-                        append(instanceName)
-//                        append("${kotuleClass.simpleName.asString()}(")
-//                        appendParameters(primaryConstructor?.parameters.orEmpty())
-//                        append(')')
+                        append("${kotuleClass.simpleName.asString()}(")
+                        appendParameters(primaryConstructor?.parameters.orEmpty())
+                        append(')')
                     })
                     .build()
             )
@@ -151,18 +148,6 @@ internal class KotuleBindingClassGenerator(
             val functions: Sequence<KSFunctionDeclaration> =
                 kotuleClass.getAllFunctions().filterRelevantFunctions(kotuleClass)
             addFunctions(functions)
-
-//            if (primaryConstructor != null) {
-//                primaryConstructor(
-//                    FunSpec.constructorBuilder()
-//                        .apply {
-//                            for (param in primaryConstructor.parameters) {
-//                                addParameter(param.name!!.asString(), param.type.toTypeName())
-//                            }
-//                        }
-//                        .build()
-//                )
-//            }
         }.build()
 
     private fun TypeSpec.Builder.addProperties(properties: Map<String, KSType>) {
@@ -211,28 +196,31 @@ internal class KotuleBindingClassGenerator(
             append("it")
 
             if (LIST_TYPES.contains(propertyType.toClassName().canonicalName)) {
-                val listItemType: KSType = propertyType.arguments.single().type!!.resolve()
-                val listItemIsPrimitive: Boolean =
-                    PRIMITIVE_TYPES.contains(listItemType.toClassName().canonicalName)
-
-                append(".map { ")
-                if (listItemIsPrimitive) {
-                    append(scope.OutValue)
-                    append("(it)")
-                } else {
-                    append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
-                    append('(')
-                    appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
-                    append(')')
-                }
-                append(" }")
+                appendListMapSuffix(propertyType)
             }
-        } else {
-            val params: List<KSValueParameter> =
-                (propertyType.declaration as KSClassDeclaration).primaryConstructor?.parameters.orEmpty()
-            appendParameters(params) { "it.$it" }
+        }
+        else {
+            appendParameters((propertyType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
         }
         append(")\n}")
+    }
+
+    private fun StringBuilder.appendListMapSuffix(propertyType: KSType) {
+        val listItemType: KSType = propertyType.arguments.single().type!!.resolve()
+        val listItemIsPrimitive: Boolean =
+            PRIMITIVE_TYPES.contains(listItemType.toClassName().canonicalName)
+
+        append(".map { ")
+        if (listItemIsPrimitive) {
+            append(scope.OutValue)
+            append("(it)")
+        } else {
+            append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
+            append('(')
+            appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+            append(')')
+        }
+        append(" }")
     }
 
     private fun TypeSpec.Builder.addFunctions(functions: Sequence<KSFunctionDeclaration>) {
@@ -330,21 +318,7 @@ internal class KotuleBindingClassGenerator(
                             append(')')
 
                             if (LIST_TYPES.contains(returnType.toClassName().canonicalName)) {
-                                val listItemType: KSType = returnType.arguments.single().type!!.resolve()
-                                val listItemIsPrimitive: Boolean = PRIMITIVE_TYPES.contains(listItemType.toClassName().canonicalName)
-
-                                append(".map { ")
-                                if (listItemIsPrimitive) {
-                                    append(outValueName)
-                                    append("(it)")
-                                }
-                                else {
-                                    append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
-                                    append('(')
-                                    appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
-                                    append(')')
-                                }
-                                append(" }")
+                                appendListMapSuffix(returnType)
                             }
 
                             append(")\n}")
@@ -358,8 +332,8 @@ internal class KotuleBindingClassGenerator(
                             append("with ($instanceName.${function.simpleName.asString()}(")
                             appendParameters(function.parameters)
                             append(")) { $outputBindingName(")
-                            appendParameters(returnTypeDeclaration.primaryConstructor!!.parameters)
-                            append(")\n} }")
+                            appendParameters((returnType.declaration as KSClassDeclaration).primaryConstructor?.parameters.orEmpty())
+                            append(")}\n}")
                         }
                     }
                 )
