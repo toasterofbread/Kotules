@@ -19,6 +19,7 @@ import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.generator.KotuleBindingInterfaceGenerator
 import dev.toastbits.kotules.binder.runtime.generator.KotuleLoaderGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
+import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.core.Kotule
 import dev.toastbits.kotules.runtime.KotuleLoader
@@ -60,7 +61,7 @@ internal class KotuleRuntimeAnnotationProcessor(
     }
 
     private fun generateClassBindings(kotuleInterface: KSClassDeclaration) {
-        val bindingName: String = KotuleRuntimeBinderConstants.getInputBindingName(kotuleInterface)
+        val bindingName: String = KotuleCoreBinderConstants.getInputBindingName(kotuleInterface)
         val loaderName: String = KotuleRuntimeBinderConstants.getLoaderName(kotuleInterface)
 
         for (target in KmpTarget.entries) {

@@ -15,6 +15,8 @@ import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.LambdaTypeName
+import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.PropertySpec
@@ -27,13 +29,13 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
 import dev.toastbits.kotules.core.type.ValueType
+import dev.toastbits.kotules.core.util.LIST_TYPES
+import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.KotulePromise
-import dev.toastbits.kotules.extension.util.LIST_TYPES
-import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.runtime.KotuleInputBinding
 
 private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, canBePrimitive: Boolean = false): TypeName {
@@ -55,7 +57,7 @@ private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, canBePrimi
     val declaration: KSDeclaration = type.declaration
     check(declaration is KSClassDeclaration) { "$declaration (${declaration::class})" }
 
-    val typeClass: ClassName = resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
+    val typeClass: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputBindingName(type.toClassName().simpleName))
     log("Generating input interop type for $type (${type.toClassName()})")
 
     return generateNew(typeClass) {
@@ -84,7 +86,7 @@ private fun FileGenerator.Scope.getInputInteropTypeFor(type: KSType, canBePrimit
     val declaration: KSDeclaration = type.declaration
     check(declaration is KSClassDeclaration) { "$declaration (${declaration::class})" }
 
-    val typeClass: ClassName = resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
+    val typeClass: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputBindingName(type.toClassName().simpleName))
     log("Generating input interop type for $type (${type.toClassName()})")
 
     return generateNew(typeClass) {
@@ -110,6 +112,24 @@ internal class KotuleBindingInterfaceGenerator(
     ): TypeSpec? =
         if (scope.target != KmpTarget.COMMON && !scope.target.isWeb()) null
         else TypeSpec.interfaceBuilder(name).apply {
+            scope.generateNew(ClassName(scope.file.packageName, name + "_Constructor")) {
+                file.addFunction(
+                    FunSpec.builder(name)
+                        .apply {
+                            returns(ClassName(scope.file.packageName, name))
+                            addModifiers(KModifier.INTERNAL)
+                            if (scope.target == KmpTarget.COMMON) {
+                                addModifiers(KModifier.EXPECT)
+                            }
+                            else {
+                                addModifiers(KModifier.ACTUAL)
+                                addCode("return js(\"{}\")")
+                            }
+                        }
+                        .build()
+                )
+            }
+
             val expectationModifier: KModifier =
                 if (scope.target == KmpTarget.COMMON) KModifier.EXPECT
                 else KModifier.ACTUAL
@@ -148,7 +168,7 @@ internal class KotuleBindingInterfaceGenerator(
             }
 
             if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                val mapperName: ClassName = scope.resolveInPackage(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface))
+                val mapperName: ClassName = scope.resolveInPackage(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
                 scope.generateNew(mapperName) {
                     KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
                         this@generateNew.file.addType(it)
@@ -170,7 +190,7 @@ internal class KotuleBindingInterfaceGenerator(
                                 append("return ")
 
                                 if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                                    append(KotuleRuntimeBinderConstants.getMapperName(kotuleInterface))
+                                    append(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
                                     append("(this)")
                                 }
                                 else {
@@ -234,39 +254,37 @@ internal class KotuleBindingInterfaceGenerator(
                 continue
             }
 
-            addFunction(
-                FunSpec.builder(function.simpleName.asString())
-                    .apply {
-                        addModifiers(expectationModifier, KModifier.ABSTRACT)
-//                        addModifiers(
-//                            function
-//                                .modifiers
-//                                .filter { it != Modifier.SUSPEND && it != Modifier.OVERRIDE }
-//                                .mapNotNull { it.toKModifier() }
-//                        )
+            val returnType: KSType? = function.returnType?.resolve()
+            val actualReturnType: TypeName =
+                if (function.modifiers.contains(Modifier.SUSPEND)) {
+                    val promiseTypeParam: TypeName =
+                        returnType?.let { scope.getOutputInteropTypeFor(it) }
+                            ?: ValueType::class.asClassName()
 
-                        val returnType: KSType? = function.returnType?.resolve()
-                        if (function.modifiers.contains(Modifier.SUSPEND)) {
-                            val promiseTypeParam: TypeName =
-                                returnType?.let { scope.getOutputInteropTypeFor(it) }
-                                ?: ValueType::class.asClassName()
+                    KotulePromise::class.asClassName().plusParameter(promiseTypeParam)
+                }
+                else if (returnType != null) scope.getOutputInteropTypeFor(returnType, canBePrimitive = true)
+                else Unit::class.asClassName()
 
-                            returns(KotulePromise::class.asClassName().plusParameter(promiseTypeParam))
-                        }
-                        else if (returnType != null) {
-                            returns(scope.getOutputInteropTypeFor(returnType, canBePrimitive = true))
-                        }
+            val functionName: String = function.simpleName.asString()
 
-                        for (parameter in function.parameters) {
-                            addParameter(
-                                parameter.name!!.asString(),
+            addProperty(
+                PropertySpec.builder(
+                    functionName,
+                    LambdaTypeName.get(
+                        returnType = actualReturnType,
+                        parameters = function.parameters.map {
+                            ParameterSpec.unnamed(
                                 scope.getOutputInteropTypeFor(
-                                    parameter.type.resolve(),
+                                    it.type.resolve(),
                                     canBePrimitive = true
                                 )
                             )
                         }
-                    }
+                    )
+                )
+                    .mutable(true)
+                    .addModifiers(expectationModifier, KModifier.ABSTRACT)
                     .build()
             )
         }

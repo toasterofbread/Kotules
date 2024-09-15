@@ -9,5 +9,11 @@ object KotuleExtensionBinderConstants {
     fun getOutputBindingName(kotuleClass: KSClassDeclaration): String =
         getOutputBindingName(kotuleClass.simpleName.asString())
 
+    fun getInputMapperName(className: String): String =
+        "${className}_InputMapper"
+
+    fun getInputBindingName(className: String): String =
+        "${className}_InputBinding"
+
     const val OUTPUT_BINDING_INSTANCE_NAME: String = "_instance"
 }

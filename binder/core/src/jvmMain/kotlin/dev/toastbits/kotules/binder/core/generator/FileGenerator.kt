@@ -31,12 +31,9 @@ class FileGenerator(
         generationScope: Scope.() -> Unit
     ): ClassName {
         val fileLocation: FileLocation = FileLocation(packageName, name)
-        log("generate($fileLocation)")
-
         if (filesToWrite[fileLocation]?.containsKey(target) == true) {
             return ClassName(packageName, name)
         }
-
         filesToWrite.getOrPut(fileLocation) { mutableMapOf() }[target] = null
 
         val fileSpecBuilder: FileSpec.Builder = FileSpec.builder(packageName, name)
@@ -74,7 +71,7 @@ class FileGenerator(
                 groupFound = true
 
                 for ((target, file) in targets) {
-                    writeFile(file!!, location, target, groupName)
+                    writeFile(location, target, file!!, groupName)
                 }
                 break
             }
@@ -95,7 +92,7 @@ class FileGenerator(
                 }
 
                 if (file != null) {
-                    writeFile(file, location, KmpTarget.COMMON, groupName)
+                    writeFile(location, KmpTarget.COMMON, file, groupName)
                     groupFound = true
                     break
                 }
@@ -106,7 +103,7 @@ class FileGenerator(
             }
 
             for ((target, file) in targets) {
-                writeFile(file!!, location, target)
+                writeFile(location, target, file!!)
             }
         }
 
@@ -123,7 +120,7 @@ class FileGenerator(
     private fun removeEmptyFiles() {
         for ((location, targets) in filesToWrite) {
             for ((target, file) in targets.toMap()) {
-                if (file?.typeSpecs.isNullOrEmpty()) {
+                if (file?.members.isNullOrEmpty()) {
                     targets.remove(target)
                 }
             }
@@ -131,11 +128,13 @@ class FileGenerator(
     }
 
     private fun writeFile(
-        fileSpec: FileSpec,
         location: FileLocation,
         target: KmpTarget,
+        fileSpec: FileSpec,
         commonGroupName: String = "common"
     ) {
+        log("write($location, $target)")
+
         val outputPath: String = (
             if (target == KmpTarget.COMMON) commonGroupName
             else target.getSourceSetName()
@@ -166,8 +165,6 @@ class FileGenerator(
         val file: FileSpec.Builder,
         private val packageName: String
     ) {
-        val logger: KSPLogger get() = this@FileGenerator.logger
-
         fun resolveInPackage(name: String): ClassName = ClassName(packageName, name)
 
         fun import(packageName: String, name: String): ClassName {
@@ -183,7 +180,7 @@ class FileGenerator(
         fun importFromPackage(name: String): ClassName =
             import(packageName, name)
 
-        fun generateNew(className: ClassName, generationScope: Scope.() -> Unit): ClassName =
+        fun generateNew(className: ClassName, target: KmpTarget = this.target, generationScope: Scope.() -> Unit): ClassName =
             generate(className, target, generationScope)
 
         fun log(msg: Any?) = this@FileGenerator.log(msg)

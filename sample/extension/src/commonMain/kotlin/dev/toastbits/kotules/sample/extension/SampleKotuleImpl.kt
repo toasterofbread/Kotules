@@ -59,6 +59,6 @@ class SampleKotuleImpl: SampleKotule {
             )
         )
 
-//    override fun inputTest(input: SampleInputInterface): String =
-//        (input.getText() + " ").repeat(5)
+    override fun inputTest(input: SampleInputInterface): String =
+        (input.getText() + " ").repeat(5)
 }

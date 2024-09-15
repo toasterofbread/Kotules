@@ -1,5 +1,6 @@
 package dev.toastbits.kotules.binder.extension.generator
 
+import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
@@ -10,7 +11,6 @@ import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.PropertySpec
@@ -25,16 +25,18 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
+import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.binder.runtime.util.filterRelevantFunctions
+import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
+import dev.toastbits.kotules.core.util.LIST_TYPES
+import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.OutKotulePromise
 import dev.toastbits.kotules.extension.PlatformJsExport
 import dev.toastbits.kotules.extension.PlatformJsName
 import dev.toastbits.kotules.extension.kotulePromise
 import dev.toastbits.kotules.extension.type.OutValue
 import dev.toastbits.kotules.extension.type.OutValueContainer
-import dev.toastbits.kotules.extension.util.LIST_TYPES
-import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
 import kotlin.reflect.KCallable
 
 private val FileGenerator.Scope.OutValue: String
@@ -45,11 +47,9 @@ private val FileGenerator.Scope.OutValue: String
         return outValueName
     }
 
-fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimitive: Boolean = false): Pair<TypeName, String?> {
+fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimitive: Boolean = false, isInput: Boolean = false): Pair<TypeName, String?> {
     val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(type.toClassName().canonicalName)
     val isListType: Boolean = isPrimitive && LIST_TYPES.contains(type.toClassName().canonicalName)
-
-    log("GEN ${type.toClassName().canonicalName} $isPrimitive $isListType")
 
     if (canBePrimitive && !isListType && isPrimitive) {
         return type.toTypeName() to null
@@ -63,31 +63,67 @@ fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimi
             return outputType to OutValue
         }
 
-        val outputBindingName: String = KotuleExtensionBinderConstants.getOutputBindingName(type.toClassName().simpleName)
-        val outputType: ClassName =
-            generateNew(resolveInPackage(outputBindingName)) {
-                file.addType(KotuleBindingClassGenerator(this).generate(outputBindingName, type.declaration as KSClassDeclaration)!!)
+        if (isInput) {
+            val inputBindingName: String = KotuleExtensionBinderConstants.getInputBindingName(type.toClassName().simpleName)
+            val inputMapperName: String = KotuleExtensionBinderConstants.getInputMapperName(type.toClassName().simpleName)
+            val inputType: ClassName =
+                generateNew(resolveInPackage(inputBindingName)) {
+                    file.addType(
+//                        KotuleB(this).generate(inputBindingName, type.declaration as KSClassDeclaration, force = true)!!
+                        TypeSpec.interfaceBuilder(inputBindingName)
+                            .apply {
+                                addAnnotation(ClassName("kotlin.js", "JsExport"))
+//                                val dec = type.declaration as KSClassDeclaration
+                                addFunction(
+                                    FunSpec.builder("getText")
+                                        .returns(String::class)
+                                        .addModifiers(KModifier.ABSTRACT)
+                                        .addAnnotation(
+                                            AnnotationSpec.builder(ClassName("kotlin.js", "JsName"))
+                                                .addMember("name = \"getText\"")
+                                                .build()
+                                        )
+                                        .build()
+                                )
+                            }
+                            .build()
+                    )
+                }
+
+            generateNew(resolveInPackage(inputMapperName)) {
+                file.addType(
+                    TypeSpec.classBuilder(inputMapperName)
+                        .apply {
+                            addSuperinterface(type.toTypeName())
+                            addAnnotation(ClassName("kotlin.js", "JsExport"))
+
+                            primaryConstructor(FunSpec.constructorBuilder().addParameter("_instance", inputType).build())
+                            addProperty(PropertySpec.builder("_instance", inputType).initializer("_instance").build())
+
+                            addFunction(
+                                FunSpec.builder("getText")
+                                    .returns(String::class)
+                                    .addModifiers(KModifier.OVERRIDE)
+                                    .addCode("return _instance.getText()")
+                                    .build()
+                            )
+                        }
+                        .build()
+                )
             }
 
-        return outputType to outputBindingName
-    }
+            return inputType to inputBindingName
+        }
+        else {
+            val outputBindingName: String = KotuleExtensionBinderConstants.getOutputBindingName(type.toClassName().simpleName)
+            val outputType: ClassName =
+                generateNew(resolveInPackage(outputBindingName)) {
+                    file.addType(KotuleBindingClassGenerator(this).generate(outputBindingName, type.declaration as KSClassDeclaration)!!)
+                }
 
-//    val canonicalName: String = type.toClassName().canonicalName
-//    if (canBePrimitive && PRIMITIVE_TYPES.contains(canonicalName) && !LIST_TYPES.contains(canonicalName)) {
-//        return type.toTypeName()
-//    }
-//
-//    type.getBuiltInInputWrapperClass(this)?.also { return it }
-//
-//    val declaration: KSDeclaration = type.declaration
-//    check(declaration is KSClassDeclaration) { declaration }
-//
-//    val typeClass: ClassName = resolveInPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
-//    return generateNew(typeClass) {
-//        interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
-//            file.addType(it)
-//        }
-//    }
+            return outputType to outputBindingName
+        }
+    }
 }
 
 
@@ -124,16 +160,21 @@ internal class KotuleBindingClassGenerator(
                     throw RuntimeException("$name $kotuleClass", e)
                 }
 
-            addProperty(
-                PropertySpec.builder(instanceName, instanceType)
-                    .addModifiers(KModifier.PRIVATE)
-                    .initializer(buildString {
-                        append("${kotuleClass.simpleName.asString()}(")
-                        appendParameters(primaryConstructor?.parameters.orEmpty())
-                        append(')')
-                    })
-                    .build()
-            )
+            if (kotuleClass.isAbstract()) {
+                addModifiers(KModifier.ABSTRACT)
+            }
+            else {
+                addProperty(
+                    PropertySpec.builder(instanceName, instanceType)
+                        .addModifiers(KModifier.PRIVATE)
+                        .initializer(buildString {
+                            append("${kotuleClass.simpleName.asString()}(")
+                            appendParameters(primaryConstructor?.parameters.orEmpty())
+                            append(')')
+                        })
+                        .build()
+                )
+            }
 
             addAnnotation(PlatformJsExport::class)
 
@@ -143,14 +184,18 @@ internal class KotuleBindingClassGenerator(
                     .build()
             )
 
-            addProperties(kotuleClass.getAllProperties().associate { it.simpleName.asString() to it.type.resolve() })
+            addProperties(
+                kotuleClass.getAllProperties().associate { it.simpleName.asString() to it.type.resolve() },
+                kotuleClass.isAbstract()
+            )
 
-            val functions: Sequence<KSFunctionDeclaration> =
-                kotuleClass.getAllFunctions().filterRelevantFunctions(kotuleClass)
-            addFunctions(functions)
+            addFunctions(
+                kotuleClass.getAllFunctions().filterRelevantFunctions(kotuleClass),
+                kotuleClass.isAbstract()
+            )
         }.build()
 
-    private fun TypeSpec.Builder.addProperties(properties: Map<String, KSType>) {
+    private fun TypeSpec.Builder.addProperties(properties: Map<String, KSType>, isAbstract: Boolean) {
         for ((propertyName, propertyType) in properties) {
             val (outPropertyType: TypeName, outPropertyTypeConstructor: String?) = scope.getInteropTypeAndConstructorFor(propertyType)
             val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(propertyType.toClassName().canonicalName)
@@ -158,6 +203,11 @@ internal class KotuleBindingClassGenerator(
             addProperty(
                 PropertySpec.builder(propertyName, outPropertyType.copy(nullable = propertyType.isMarkedNullable))
                     .apply {
+                        if (isAbstract) {
+                            addModifiers(KModifier.ABSTRACT)
+                            return@apply
+                        }
+
                         getter(
                             FunSpec.getterBuilder()
                                 .addCode(
@@ -212,8 +262,7 @@ internal class KotuleBindingClassGenerator(
 
         append(".map { ")
         if (listItemIsPrimitive) {
-            append(scope.OutValue)
-            append("(it)")
+            append("${scope.OutValue}(it)")
         } else {
             append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
             append('(')
@@ -223,30 +272,44 @@ internal class KotuleBindingClassGenerator(
         append(" }")
     }
 
-    private fun TypeSpec.Builder.addFunctions(functions: Sequence<KSFunctionDeclaration>) {
+    private fun TypeSpec.Builder.addFunctions(
+        functions: Sequence<KSFunctionDeclaration>,
+        isAbstract: Boolean
+    ) {
         for (function in functions) {
             if (function.isConstructor()) {
                 continue
             }
 
             if (function.modifiers.contains(Modifier.SUSPEND)) {
-                addFunction(generateSuspendFunction(function))
+                addFunction(generateSuspendFunction(function, isAbstract))
             }
             else {
-                addFunction(generateNonSuspendFunction(function))
+                addFunction(generateNonSuspendFunction(function, isAbstract))
             }
         }
     }
 
     private fun FunSpec.Builder.addInteropParameters(parameters: List<KSValueParameter>) {
         for (parameter in parameters) {
-            addParameter(parameter.name!!.asString(), scope.getInteropTypeAndConstructorFor(parameter.type.resolve(), canBePrimitive = true).first)
+            addParameter(
+                parameter.name!!.asString(),
+                scope.getInteropTypeAndConstructorFor(
+                    parameter.type.resolve(),
+                    canBePrimitive = true,
+                    isInput = true
+                ).first
+            )
         }
     }
 
-    private fun generateNonSuspendFunction(function: KSFunctionDeclaration): FunSpec =
+    private fun generateNonSuspendFunction(function: KSFunctionDeclaration, isAbstract: Boolean): FunSpec =
         FunSpec.builder(function.simpleName.asString())
             .apply {
+                if (isAbstract) {
+                    addModifiers(KModifier.ABSTRACT)
+                }
+
 //                addModifiers(
 //                    function.modifiers
 //                        .filter { it != Modifier.SUSPEND && it != Modifier.OVERRIDE }
@@ -259,16 +322,11 @@ internal class KotuleBindingClassGenerator(
 
                 addInteropParameters(function.parameters)
 
-                if (!function.isAbstract) {
+                if (!function.isAbstract && !isAbstract) {
                     addCode(
                         buildString {
                             append("return $instanceName.${function.simpleName.asString()}(")
-                            for ((index, parameter) in function.parameters.withIndex()) {
-                                append(parameter.name!!.asString())
-                                if (index + 1 != function.parameters.size) {
-                                    append(", ")
-                                }
-                            }
+                            addFunctionCallArgs(function.parameters)
                             append(')')
                         }
                     )
@@ -276,9 +334,13 @@ internal class KotuleBindingClassGenerator(
             }
             .build()
 
-    private fun generateSuspendFunction(function: KSFunctionDeclaration): FunSpec =
+    private fun generateSuspendFunction(function: KSFunctionDeclaration, isAbstract: Boolean): FunSpec =
         FunSpec.builder(function.simpleName.asString())
             .apply {
+                if (isAbstract) {
+                    addModifiers(KModifier.ABSTRACT)
+                }
+
                 addModifiers(
                     function.modifiers
                         .filter { it != Modifier.SUSPEND && it != Modifier.OVERRIDE }
@@ -288,6 +350,10 @@ internal class KotuleBindingClassGenerator(
                 returns(OutKotulePromise::class)
 
                 addInteropParameters(function.parameters)
+
+                if (isAbstract) {
+                    return@apply
+                }
 
                 addCode(
                     buildString {
@@ -309,12 +375,7 @@ internal class KotuleBindingClassGenerator(
                             append("$outValueName(")
 
                             append("$instanceName.${function.simpleName.asString()}(")
-                            for ((index, parameter) in function.parameters.withIndex()) {
-                                append(parameter.name!!.asString())
-                                if (index + 1 != function.parameters.size) {
-                                    append(", ")
-                                }
-                            }
+                            addFunctionCallArgs(function.parameters)
                             append(')')
 
                             if (LIST_TYPES.contains(returnType.toClassName().canonicalName)) {
@@ -339,4 +400,20 @@ internal class KotuleBindingClassGenerator(
                 )
             }
             .build()
+
+    private fun StringBuilder.addFunctionCallArgs(parameters: List<KSValueParameter>) {
+        for ((index, parameter) in parameters.withIndex()) {
+            append(parameter.name!!.asString())
+
+            val qualifiedName: String = parameter.type.resolve().resolveTypeAlias()
+            if (!PRIMITIVE_TYPES.contains(qualifiedName)) {
+                val mapperName: String = KotuleExtensionBinderConstants.getInputMapperName(qualifiedName.split(".").last())
+                append(".let { $mapperName(it) }")
+            }
+
+            if (index + 1 != parameters.size) {
+                append(", ")
+            }
+        }
+    }
 }

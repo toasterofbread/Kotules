@@ -9,8 +9,9 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
+import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
-import dev.toastbits.kotules.extension.util.LIST_TYPES
+import dev.toastbits.kotules.core.util.LIST_TYPES
 
 internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): TypeName? {
     val className: String =
@@ -36,7 +37,7 @@ internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): Typ
                 val declaration: KSDeclaration = type.declaration
                 check(declaration is KSClassDeclaration) { declaration }
 
-                val typeClass: ClassName = scope.importFromPackage(KotuleRuntimeBinderConstants.getInputBindingName(type.toClassName().simpleName))
+                val typeClass: ClassName = scope.importFromPackage(KotuleCoreBinderConstants.getInputBindingName(type.toClassName().simpleName))
                 scope.generateNew(typeClass) {
                     interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
                         file.addType(it)

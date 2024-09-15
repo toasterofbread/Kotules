@@ -1,5 +1,5 @@
 @file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
-package dev.toastbits.kotules.extension.util
+package dev.toastbits.kotules.core.util
 
 import kotlin.reflect.KClass
 

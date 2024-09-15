@@ -18,29 +18,34 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
+import dev.toastbits.kotules.binder.runtime.util.kotulesJsonInstance
 import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
+import dev.toastbits.kotules.core.type.ValueType
+import dev.toastbits.kotules.core.util.LIST_TYPES
+import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
-import dev.toastbits.kotules.core.type.ValueType
-import dev.toastbits.kotules.extension.util.LIST_TYPES
-import dev.toastbits.kotules.extension.util.PRIMITIVE_TYPES
-import dev.toastbits.kotules.extension.util.kotulesJsonInstance
 
-internal class KotuleMapperClassGenerator(
+class KotuleMapperClassGenerator(
     private val scope: FileGenerator.Scope
 ) {
-    private val instanceName: String = KotuleRuntimeBinderConstants.MAPPER_INSTANCE_NAME
+    private val instanceName: String = KotuleCoreBinderConstants.MAPPER_INSTANCE_NAME
 
     fun generate(
         name: String,
-        kotuleInterface: KSClassDeclaration
+        kotuleInterface: KSClassDeclaration,
+        force: Boolean = false
     ): TypeSpec? =
-        if (scope.target == KmpTarget.COMMON || scope.target == KmpTarget.JVM) null
+        if (!force && (scope.target == KmpTarget.COMMON || scope.target == KmpTarget.JVM)) null
         else TypeSpec.classBuilder(name).apply {
-            val inputClassName: ClassName = scope.importFromPackage(KotuleRuntimeBinderConstants.getInputBindingName(kotuleInterface))
+            val inputClassName: ClassName = scope.importFromPackage(
+                KotuleCoreBinderConstants.getInputBindingName(
+                    kotuleInterface
+                )
+            )
 
             addModifiers(KModifier.INTERNAL)
 
@@ -65,7 +70,10 @@ internal class KotuleMapperClassGenerator(
     private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
         for (property in properties) {
             addProperty(
-                PropertySpec.builder(property.simpleName.asString(), property.type.toTypeName())
+                PropertySpec.Companion.builder(
+                    property.simpleName.asString(),
+                    property.type.toTypeName()
+                )
                     .apply {
                         property.getter?.also { getter ->
                             getter(
@@ -122,22 +130,55 @@ internal class KotuleMapperClassGenerator(
 
                 addCode(
                     buildString {
-                        if (returnType != null) {
-                            append("return ")
-                        }
-
-                        append("$instanceName.${function.simpleName.asString()}(")
-                        appendParameters(function.parameters) { it + getFunctionParameterTransformSuffix(this) }
-                        append(')')
-
-                        if (returnType != null) {
-                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), true))
-                        }
+                        appendFunctionCallReturn(function, returnType, true)
                     }
                 )
             }
             .build()
 
+    private fun StringBuilder.appendFunctionCallReturn(
+        function: KSFunctionDeclaration,
+        returnType: KSTypeReference?,
+        canBePrimitive: Boolean,
+        resultTransform: String = ""
+    ) {
+        val paramTransforms: List<String?> =
+            function.parameters.map { param ->
+                getFunctionParameterTransformSuffix(param.type.resolve()).ifBlank { null }
+            }
+
+        val paramNamePrefix: String = "_parameter"
+        for ((index, param) in function.parameters.withIndex()) {
+            val transform: String = paramTransforms[index] ?: continue
+            val name: String = "$paramNamePrefix$index"
+            appendLine("val $name = ${param.name!!.asString()}$transform")
+        }
+
+        if (returnType != null) {
+            append("return ")
+        }
+
+        append("$instanceName.${function.simpleName.asString()}(")
+
+        for ((index, param) in function.parameters.withIndex()) {
+            val name: String =
+                if (paramTransforms[index] != null) "$paramNamePrefix$index"
+                else param.name!!.asString()
+
+            append(name)
+            if (index + 1 != function.parameters.size) {
+                append(", ")
+            }
+        }
+
+        append(')')
+        append(resultTransform)
+
+        if (returnType != null) {
+            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), canBePrimitive))
+        }
+    }
+    
     private fun generateSuspendFunction(function: KSFunctionDeclaration): FunSpec =
         FunSpec.builder(function.simpleName.asString())
             .apply {
@@ -158,25 +199,21 @@ internal class KotuleMapperClassGenerator(
                     buildString {
                         val awaitName: String = KotulePromise<ValueType>::await.name
                         val awaitPackage: String = KotulePromise::class.java.packageName
-
                         scope.import(awaitPackage, awaitName)
 
-                        if (returnType != null) {
-                            append("return ")
-                        }
-                        append("$instanceName.${function.simpleName.asString()}(")
-                        appendParameters(function.parameters) { it + getFunctionParameterTransformSuffix(this) }
-                        append(").$awaitName()")
-
-                        if (returnType != null) {
-                            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), false))
-                        }
+                        appendFunctionCallReturn(function, returnType, false, resultTransform = ".await()")
                     }
                 )
             }
             .build()
 
     private fun getFunctionParameterTransformSuffix(type: KSType): String = buildString {
+        val canonicalName: String = type.resolveTypeAlias()
+
+        if (PRIMITIVE_TYPES.contains(canonicalName)) {
+            return@buildString
+        }
+
         if (type.declaration.shouldBeSerialsied()) {
             val kotulesJsonInstance: String = (::kotulesJsonInstance).name
             scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
@@ -186,7 +223,6 @@ internal class KotuleMapperClassGenerator(
             return@buildString
         }
 
-        val canonicalName: String = type.resolveTypeAlias()
         if (canonicalName.startsWith("kotlin.Function")) {
             val functionName: String = "lambda"
             val argumentPrefix: String = "arg"
@@ -222,6 +258,15 @@ internal class KotuleMapperClassGenerator(
             append(" } }")
             return@buildString
         }
+
+        val typeDeclaration: KSClassDeclaration = type.declaration as KSClassDeclaration
+        val bindingName: String = KotuleCoreBinderConstants.getInputBindingName(typeDeclaration)
+        appendLine(".let { $bindingName().apply { ")
+        for (function in typeDeclaration.getDeclaredFunctions()) {
+            val functionName: String = function.simpleName.asString()
+            appendLine("$functionName = it::$functionName")
+        }
+        append(" } }")
     }
 
     private fun getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {

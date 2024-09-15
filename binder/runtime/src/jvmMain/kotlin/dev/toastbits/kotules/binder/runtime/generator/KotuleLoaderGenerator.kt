@@ -9,6 +9,7 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
+import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.runtime.KotuleLoader
 
@@ -87,7 +88,7 @@ internal class KotuleLoaderGenerator(
                             )
                         )
                         .addCode(buildString {
-                            val mapperClass: String = KotuleRuntimeBinderConstants.getMapperName(kotuleInterface)
+                            val mapperClass: String = KotuleCoreBinderConstants.getInputMapperName(kotuleInterface)
                             scope.import("dev.toastbits.kotules.runtime", "loadKotuleInputBindingFromKotlinJsCode")
 
                             append("return $mapperClass(loadKotuleInputBindingFromKotlinJsCode(jsCode, implementationClass))")

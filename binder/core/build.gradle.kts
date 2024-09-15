@@ -14,8 +14,10 @@ kotlin {
     sourceSets {
         val jvmMain by getting {
             dependencies {
+                implementation(projects.extension)
                 implementation(libs.ksp.api)
                 implementation(libs.poet)
+                implementation(libs.poet.ksp)
                 implementation(libs.kotlinx.serialization.json)
             }
         }

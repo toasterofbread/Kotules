@@ -4,14 +4,14 @@ suspend fun runSampleKotule() {
     val kotule: SampleKotule = loadSampleKotule()
     println("Loaded SampleKotule: $kotule")
 
-//    println("Calling inputTest() on SampleKotule")
-//    val input: SampleInputInterface =
-//        object : SampleInputInterface {
-//            override fun getText(): String = "Hello"
-//        }
-//    val inputResult: String = kotule.inputTest(input)
-//    println("Got result from inputTest: $inputResult")
-//    TODO()
+    println("Calling inputTest() on SampleKotule")
+    val input: SampleInputInterface =
+        object : SampleInputInterface {
+            override fun getText(): String = "Hello"
+        }
+    val inputResult: String = kotule.inputTest(input)
+    println("Got result from inputTest: $inputResult")
+    TODO()
 
     println("Calling repeatInput(\"Hello \", 5) on SampleKotule")
     val repeatResult: String = kotule.repeatInput("Hello", 5)

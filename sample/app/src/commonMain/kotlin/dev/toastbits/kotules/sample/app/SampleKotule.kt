@@ -2,6 +2,7 @@ package dev.toastbits.kotules.sample.app
 
 import dev.toastbits.kotules.core.Kotule
 import dev.toastbits.kotules.runtime.annotation.KotuleDeclaration
+import kotlin.js.JsName
 
 @KotuleDeclaration
 interface SampleKotule: Kotule {
@@ -21,10 +22,11 @@ interface SampleKotule: Kotule {
 
     suspend fun getDataClass(): SampleDataClass
 
-//    fun inputTest(input: SampleInputInterface): String
+    fun inputTest(input: SampleInputInterface): String
 }
 
 interface SampleInputInterface {
+    @JsName("getText")
     fun getText(): String
 }
 
