@@ -39,7 +39,7 @@ internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): Typ
 
                 val typeClass: ClassName = scope.importFromPackage(KotuleCoreBinderConstants.getInputBindingName(type.toClassName().simpleName))
                 scope.generateNew(typeClass) {
-                    interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
+                    interfaceGenerator.generate(typeClass.simpleName, declaration, true)?.also {
                         file.addType(it)
                     }
                 }

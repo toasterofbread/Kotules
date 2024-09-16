@@ -72,7 +72,7 @@ internal class KotuleRuntimeAnnotationProcessor(
                 ),
                 target
             ) {
-                interfaceGenerator.generate(bindingName, kotuleInterface)?.also {
+                interfaceGenerator.generate(bindingName, kotuleInterface, false)?.also {
                     file.addType(it)
                 }
             }

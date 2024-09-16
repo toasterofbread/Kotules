@@ -61,36 +61,7 @@ private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, canBePrimi
     log("Generating input interop type for $type (${type.toClassName()})")
 
     return generateNew(typeClass) {
-        interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
-            file.addType(it)
-        }
-    }
-}
-
-private fun FileGenerator.Scope.getInputInteropTypeFor(type: KSType, canBePrimitive: Boolean = false): TypeName {
-    val canonicalName: String = type.resolveTypeAlias()
-    if (canBePrimitive && PRIMITIVE_TYPES.contains(canonicalName) && !LIST_TYPES.contains(canonicalName)) {
-        return type.toTypeName()
-    }
-
-    type.getBuiltInInputWrapperClass(this)?.also { return it }
-
-    if (canonicalName.startsWith("kotlin.Function")) {
-        return getFunctionInteropType(type)
-    }
-
-    if (type.declaration.shouldBeSerialsied()) {
-        return String::class.asTypeName()
-    }
-
-    val declaration: KSDeclaration = type.declaration
-    check(declaration is KSClassDeclaration) { "$declaration (${declaration::class})" }
-
-    val typeClass: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputBindingName(type.toClassName().simpleName))
-    log("Generating input interop type for $type (${type.toClassName()})")
-
-    return generateNew(typeClass) {
-        interfaceGenerator.generate(typeClass.simpleName, declaration)?.also {
+        interfaceGenerator.generate(typeClass.simpleName, declaration, true)?.also {
             file.addType(it)
         }
     }
@@ -108,7 +79,8 @@ internal class KotuleBindingInterfaceGenerator(
 ) {
     fun generate(
         name: String,
-        kotuleInterface: KSClassDeclaration
+        kotuleInterface: KSClassDeclaration,
+        mutableFunctions: Boolean
     ): TypeSpec? =
         if (scope.target != KmpTarget.COMMON && !scope.target.isWeb()) null
         else TypeSpec.interfaceBuilder(name).apply {
@@ -123,7 +95,7 @@ internal class KotuleBindingInterfaceGenerator(
                             }
                             else {
                                 addModifiers(KModifier.ACTUAL)
-                                addCode("return js(\"{}\")")
+                                addCode("return js(\"({})\")")
                             }
                         }
                         .build()
@@ -157,7 +129,8 @@ internal class KotuleBindingInterfaceGenerator(
                 )
                 addFunctions(
                     kotuleInterface.getDeclaredFunctions(),
-                    expectationModifier
+                    expectationModifier,
+                    mutable = mutableFunctions
                 )
             }
             else {
@@ -247,7 +220,8 @@ internal class KotuleBindingInterfaceGenerator(
 
     private fun TypeSpec.Builder.addFunctions(
         functions: Sequence<KSFunctionDeclaration>,
-        expectationModifier: KModifier
+        expectationModifier: KModifier,
+        mutable: Boolean
     ) {
         for (function in functions) {
             if (function.isConstructor()) {
@@ -267,26 +241,40 @@ internal class KotuleBindingInterfaceGenerator(
                 else Unit::class.asClassName()
 
             val functionName: String = function.simpleName.asString()
+            val functionParameters: List<ParameterSpec> =
+                function.parameters.map {
+                    ParameterSpec.builder(
+                        it.name!!.asString(),
+                        scope.getOutputInteropTypeFor(
+                            it.type.resolve(),
+                            canBePrimitive = true
+                        )
+                    ).build()
+                }
 
-            addProperty(
-                PropertySpec.builder(
-                    functionName,
-                    LambdaTypeName.get(
-                        returnType = actualReturnType,
-                        parameters = function.parameters.map {
-                            ParameterSpec.unnamed(
-                                scope.getOutputInteropTypeFor(
-                                    it.type.resolve(),
-                                    canBePrimitive = true
-                                )
-                            )
-                        }
+            if (mutable) {
+                addProperty(
+                    PropertySpec.builder(
+                        functionName,
+                        LambdaTypeName.get(
+                            returnType = actualReturnType,
+                            parameters = functionParameters
+                        )
                     )
+                        .mutable(true)
+                        .addModifiers(expectationModifier, KModifier.ABSTRACT)
+                        .build()
                 )
-                    .mutable(true)
-                    .addModifiers(expectationModifier, KModifier.ABSTRACT)
-                    .build()
-            )
+            }
+            else {
+                addFunction(
+                    FunSpec.builder(functionName)
+                        .returns(actualReturnType)
+                        .addParameters(functionParameters)
+                        .addModifiers(expectationModifier, KModifier.ABSTRACT)
+                        .build()
+                )
+            }
         }
     }
 }
