@@ -25,10 +25,10 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.binder.runtime.util.filterRelevantFunctions
-import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
+import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
+import dev.toastbits.kotules.binder.core.util.resolveTypeAliasQualifiedName
 import dev.toastbits.kotules.core.util.LIST_TYPES
 import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.OutKotulePromise
@@ -64,8 +64,8 @@ fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimi
         }
 
         if (isInput) {
-            val inputBindingName: String = KotuleExtensionBinderConstants.getInputBindingName(type.toClassName().simpleName)
-            val inputMapperName: String = KotuleExtensionBinderConstants.getInputMapperName(type.toClassName().simpleName)
+            val inputBindingName: String = KotuleExtensionBinderConstants.getInputBindingName(type.toClassName().canonicalName)
+            val inputMapperName: String = KotuleExtensionBinderConstants.getInputMapperName(type.toClassName().canonicalName)
             val inputType: ClassName =
                 generateNew(resolveInPackage(inputBindingName)) {
                     file.addType(
@@ -405,9 +405,9 @@ internal class KotuleBindingClassGenerator(
         for ((index, parameter) in parameters.withIndex()) {
             append(parameter.name!!.asString())
 
-            val qualifiedName: String = parameter.type.resolve().resolveTypeAlias()
+            val qualifiedName: String = parameter.type.resolve().resolveTypeAliasQualifiedName()
             if (!PRIMITIVE_TYPES.contains(qualifiedName)) {
-                val mapperName: String = KotuleExtensionBinderConstants.getInputMapperName(qualifiedName.split(".").last())
+                val mapperName: String = KotuleExtensionBinderConstants.getInputMapperName(qualifiedName)
                 append(".let { $mapperName(it) }")
             }
 

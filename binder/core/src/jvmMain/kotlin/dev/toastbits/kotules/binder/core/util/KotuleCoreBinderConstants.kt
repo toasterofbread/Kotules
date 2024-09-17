@@ -1,4 +1,4 @@
-package dev.toastbits.kotules.binder.runtime.util
+package dev.toastbits.kotules.binder.core.util
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 
@@ -6,14 +6,14 @@ object KotuleCoreBinderConstants {
     const val MAPPER_INSTANCE_NAME: String = "_instance"
 
     fun getInputMapperName(interfaceName: String): String =
-        "${interfaceName}_InputMapper"
+        "${interfaceName.replace('.', '_')}_InputMapper"
 
     fun getInputMapperName(kotuleInterface: KSClassDeclaration): String =
-        getInputMapperName(kotuleInterface.simpleName.asString())
+        getInputMapperName(kotuleInterface.qualifiedName!!.asString())
 
     fun getInputBindingName(interfaceName: String): String =
-        "${interfaceName}_InputBinding"
+        "${interfaceName.replace('.', '_')}_InputBinding"
 
     fun getInputBindingName(kotuleInterface: KSClassDeclaration): String =
-        getInputBindingName(kotuleInterface.simpleName.asString())
+        getInputBindingName(kotuleInterface.qualifiedName!!.asString())
 }

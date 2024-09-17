@@ -1,4 +1,4 @@
-package dev.toastbits.kotules.binder.runtime.util
+package dev.toastbits.kotules.extension.util
 
 import kotlinx.serialization.json.Json
 

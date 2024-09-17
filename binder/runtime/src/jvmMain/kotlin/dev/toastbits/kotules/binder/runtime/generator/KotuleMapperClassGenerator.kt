@@ -18,16 +18,15 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.binder.runtime.util.KotuleCoreBinderConstants
-import dev.toastbits.kotules.binder.runtime.util.appendParameters
-import dev.toastbits.kotules.binder.runtime.util.kotulesJsonInstance
-import dev.toastbits.kotules.binder.runtime.util.resolveTypeAlias
-import dev.toastbits.kotules.binder.runtime.util.shouldBeSerialsied
+import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
+import dev.toastbits.kotules.binder.core.util.resolveTypeAliasQualifiedName
+import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
 import dev.toastbits.kotules.core.type.ValueType
 import dev.toastbits.kotules.core.util.LIST_TYPES
 import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
+import dev.toastbits.kotules.extension.util.kotulesJsonInstance
 
 class KotuleMapperClassGenerator(
     private val scope: FileGenerator.Scope
@@ -208,13 +207,13 @@ class KotuleMapperClassGenerator(
             .build()
 
     private fun getFunctionParameterTransformSuffix(type: KSType): String = buildString {
-        val canonicalName: String = type.resolveTypeAlias()
+        val qualifiedName: String = type.resolveTypeAliasQualifiedName()
 
-        if (PRIMITIVE_TYPES.contains(canonicalName)) {
+        if (PRIMITIVE_TYPES.contains(qualifiedName)) {
             return@buildString
         }
 
-        if (type.declaration.shouldBeSerialsied()) {
+        if (type.declaration.shouldBeSerialised()) {
             val kotulesJsonInstance: String = (::kotulesJsonInstance).name
             scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
             scope.import("kotlinx.serialization", "encodeToString")
@@ -223,15 +222,15 @@ class KotuleMapperClassGenerator(
             return@buildString
         }
 
-        if (canonicalName.startsWith("kotlin.Function")) {
+        if (qualifiedName.startsWith("kotlin.Function")) {
             val functionName: String = "lambda"
             val argumentPrefix: String = "arg"
 
             append(".let { $functionName -> { ")
 
             val argCount: Int =
-                if (canonicalName == "kotlin.Function") 0
-                else canonicalName.removePrefix("kotlin.Function").toInt()
+                if (qualifiedName == "kotlin.Function") 0
+                else qualifiedName.removePrefix("kotlin.Function").toInt()
 
             if (argCount > 0) {
                 for (arg in 0 until argCount) {
@@ -270,14 +269,14 @@ class KotuleMapperClassGenerator(
     }
 
     private fun getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
-        if (type.declaration.shouldBeSerialsied()) {
+        if (type.declaration.shouldBeSerialised()) {
             val kotulesJsonInstance: String = (::kotulesJsonInstance).name
             scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
             append(".let { $kotulesJsonInstance.decodeFromString(it) }")
             return@buildString
         }
 
-        val qualifiedName: String = type.resolveTypeAlias()
+        val qualifiedName: String = type.resolveTypeAliasQualifiedName()
         if (LIST_TYPES.contains(qualifiedName)) {
             scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
             append(".getListValue().map { it.value }")

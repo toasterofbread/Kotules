@@ -5,6 +5,8 @@ import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.TypeName
+import com.squareup.kotlinpoet.asTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.getSourceSetName
 import java.io.OutputStream
@@ -172,10 +174,13 @@ class FileGenerator(
             return resolveInPackage(name)
         }
 
-        fun import(cls: KClass<*>): ClassName {
-            val split: List<String> = cls.qualifiedName!!.split('.')
+        fun import(type: ClassName): ClassName {
+            val split: List<String> = type.canonicalName.split('.')
             return import(split.dropLast(1).joinToString("."), split.last())
         }
+
+        fun import(cls: KClass<*>): ClassName =
+            import(cls.asTypeName())
 
         fun importFromPackage(name: String): ClassName =
             import(packageName, name)

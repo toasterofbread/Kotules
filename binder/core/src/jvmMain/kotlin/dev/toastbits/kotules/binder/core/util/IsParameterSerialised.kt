@@ -1,7 +1,7 @@
-package dev.toastbits.kotules.binder.runtime.util
+package dev.toastbits.kotules.binder.core.util
 
 import com.google.devtools.ksp.symbol.KSDeclaration
 import kotlinx.serialization.Serializable
 
-fun KSDeclaration.shouldBeSerialsied(): Boolean =
+fun KSDeclaration.shouldBeSerialised(): Boolean =
     annotations.any { it.shortName.getShortName() == Serializable::class.simpleName }
