@@ -26,11 +26,11 @@ import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstant
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
-import dev.toastbits.kotules.binder.runtime.util.filterRelevantFunctions
+import dev.toastbits.kotules.binder.core.util.getAbstractFunctions
+import dev.toastbits.kotules.binder.core.util.isListType
+import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.core.util.resolveTypeAliasQualifiedName
-import dev.toastbits.kotules.core.util.LIST_TYPES
-import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.OutKotulePromise
 import dev.toastbits.kotules.extension.PlatformJsExport
 import dev.toastbits.kotules.extension.PlatformJsName
@@ -48,8 +48,8 @@ private val FileGenerator.Scope.OutValue: String
     }
 
 fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimitive: Boolean = false, isInput: Boolean = false): Pair<TypeName, String?> {
-    val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(type.toClassName().canonicalName)
-    val isListType: Boolean = isPrimitive && LIST_TYPES.contains(type.toClassName().canonicalName)
+    val isPrimitive: Boolean = type.isPrimitiveType()
+    val isListType: Boolean = isPrimitive && type.isListType()
 
     if (canBePrimitive && !isListType && isPrimitive) {
         return type.toTypeName() to null
@@ -190,7 +190,7 @@ internal class KotuleBindingClassGenerator(
             )
 
             addFunctions(
-                kotuleClass.getAllFunctions().filterRelevantFunctions(kotuleClass),
+                kotuleClass.getAbstractFunctions(),
                 kotuleClass.isAbstract()
             )
         }.build()
@@ -198,7 +198,7 @@ internal class KotuleBindingClassGenerator(
     private fun TypeSpec.Builder.addProperties(properties: Map<String, KSType>, isAbstract: Boolean) {
         for ((propertyName, propertyType) in properties) {
             val (outPropertyType: TypeName, outPropertyTypeConstructor: String?) = scope.getInteropTypeAndConstructorFor(propertyType)
-            val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(propertyType.toClassName().canonicalName)
+            val isPrimitive: Boolean = propertyType.isPrimitiveType()
 
             addProperty(
                 PropertySpec.builder(propertyName, outPropertyType.copy(nullable = propertyType.isMarkedNullable))
@@ -245,7 +245,7 @@ internal class KotuleBindingClassGenerator(
         if (isPrimitive) {
             append("it")
 
-            if (LIST_TYPES.contains(propertyType.toClassName().canonicalName)) {
+            if (propertyType.isListType()) {
                 appendListMapSuffix(propertyType)
             }
         }
@@ -258,7 +258,7 @@ internal class KotuleBindingClassGenerator(
     private fun StringBuilder.appendListMapSuffix(propertyType: KSType) {
         val listItemType: KSType = propertyType.arguments.single().type!!.resolve()
         val listItemIsPrimitive: Boolean =
-            PRIMITIVE_TYPES.contains(listItemType.toClassName().canonicalName)
+            listItemType.isPrimitiveType()
 
         append(".map { ")
         if (listItemIsPrimitive) {
@@ -365,7 +365,7 @@ internal class KotuleBindingClassGenerator(
 
                         val returnType: KSType = function.returnType!!.resolve()
                         val returnTypeDeclaration: KSClassDeclaration = returnType.declaration as KSClassDeclaration
-                        val isPrimitive: Boolean = PRIMITIVE_TYPES.contains(returnType.toClassName().canonicalName)
+                        val isPrimitive: Boolean = returnType.isPrimitiveType()
 
                         if (isPrimitive) {
                             val outValue: (Any) -> Any = ::OutValue
@@ -378,7 +378,7 @@ internal class KotuleBindingClassGenerator(
                             addFunctionCallArgs(function.parameters)
                             append(')')
 
-                            if (LIST_TYPES.contains(returnType.toClassName().canonicalName)) {
+                            if (returnType.isListType()) {
                                 appendListMapSuffix(returnType)
                             }
 
@@ -405,9 +405,9 @@ internal class KotuleBindingClassGenerator(
         for ((index, parameter) in parameters.withIndex()) {
             append(parameter.name!!.asString())
 
-            val qualifiedName: String = parameter.type.resolve().resolveTypeAliasQualifiedName()
-            if (!PRIMITIVE_TYPES.contains(qualifiedName)) {
-                val mapperName: String = KotuleExtensionBinderConstants.getInputMapperName(qualifiedName)
+            val type: KSType = parameter.type.resolve().resolveTypeAlias()
+            if (type.isPrimitiveType()) {
+                val mapperName: String = KotuleExtensionBinderConstants.getInputMapperName(type.declaration.qualifiedName!!.asString())
                 append(".let { $mapperName(it) }")
             }
 

@@ -1,33 +1,22 @@
 package dev.toastbits.kotules.binder.runtime.mapper
 
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
+import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
-import dev.toastbits.kotules.core.util.LIST_TYPES
+import dev.toastbits.kotules.binder.core.util.isListType
 
 internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): TypeName? {
-    val className: String =
-        try {
-            this.toClassName().toString()
-        }
-        catch (_: Throwable) {
-            return null
-        }
-
-    when (className) {
-        "kotlin.Boolean" -> return getValueClassName("BooleanValue")
-        "kotlin.Int" -> return getValueClassName("IntValue")
-        "kotlin.String" -> return getValueClassName("StringValue")
-    }
-
-    if (LIST_TYPES.contains(className)) {
+    if (isListType()) {
         return getValueClassName("ListValue")
             .parameterizedBy(arguments.map { arg ->
                 val type: KSType = arg.type!!.resolve()
@@ -45,6 +34,21 @@ internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): Typ
 
                 return@map typeClass
             })
+    }
+
+    val className: String =
+        try {
+            this.toClassName().toString()
+        }
+        catch (_: Throwable) {
+            return null
+        }
+
+    when (className) {
+        "kotlin.Boolean" -> return getValueClassName("BooleanValue")
+        "kotlin.Int" -> return getValueClassName("IntValue")
+        "kotlin.String" -> return getValueClassName("StringValue")
+        "kotlin.Enum" -> return getValueClassName("EnumValue")
     }
 
     return null

@@ -1,7 +1,5 @@
 package dev.toastbits.kotules.binder.runtime.generator
 
-import com.google.devtools.ksp.getDeclaredFunctions
-import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.ClassKind
@@ -11,7 +9,6 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
-import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
@@ -28,15 +25,18 @@ import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
+import dev.toastbits.kotules.binder.core.util.getAbstractFunctions
+import dev.toastbits.kotules.binder.core.util.getAbstractProperties
+import dev.toastbits.kotules.binder.core.util.isListType
+import dev.toastbits.kotules.binder.core.util.isPrimitiveType
+import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
+import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
 import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
-import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
-import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
-import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
+import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.core.type.ValueType
-import dev.toastbits.kotules.core.util.LIST_TYPES
-import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.runtime.KotuleInputBinding
 
@@ -53,16 +53,16 @@ data class TypeArgumentInfo(
 
 private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, arguments: TypeArgumentInfo, canBePrimitive: Boolean = false): TypeName {
     val resolvedType: KSType = type.resolveTypeAlias()
-    val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
 
-    if (canBePrimitive && PRIMITIVE_TYPES.contains(qualifiedName) && !LIST_TYPES.contains(qualifiedName)) {
+    if (canBePrimitive && resolvedType.isPrimitiveType() && !resolvedType.isListType()) {
         return type.toTypeName()
     }
 
-    type.getBuiltInInputWrapperClass(this)?.also { return it }
+    resolvedType.getBuiltInInputWrapperClass(this)?.also { return it }
 
+    val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
     if (qualifiedName.startsWith("kotlin.Function")) {
-        return getFunctionInteropType(type, arguments)
+        return getFunctionInteropType(resolvedType, arguments)
     }
 
     val declaration: KSDeclaration = resolvedType.declaration
@@ -148,14 +148,21 @@ internal class KotuleBindingInterfaceGenerator(
                 )
             }
 
-            if (kotuleInterface.isAbstract()) {
+            if (kotuleInterface.classKind == ClassKind.ENUM_CLASS) {
+                addProperty(
+                    PropertySpec.builder(KotuleRuntimeBinderConstants.ENUM_BINDER_ORDINAL_PROPERTY_NAME, Int::class)
+                        .addModifiers(expectationModifier)
+                        .build()
+                )
+            }
+            else if (kotuleInterface.isAbstract()) {
                 addProperties(
-                    kotuleInterface.getDeclaredProperties().associate { it.simpleName.asString() to it.type.resolve() },
+                    kotuleInterface.getAbstractProperties().associate { it.simpleName.asString() to it.type.resolve() },
                     expectationModifier,
                     arguments
                 )
                 addFunctions(
-                    kotuleInterface.getDeclaredFunctions(),
+                    kotuleInterface.getAbstractFunctions(),
                     expectationModifier,
                     mutable = mutableFunctions,
                     arguments = arguments
@@ -177,76 +184,6 @@ internal class KotuleBindingInterfaceGenerator(
                     }
                 }
             }
-
-            if (scope.target != KmpTarget.COMMON) {
-                return@apply
-            }
-
-            scope.file.addProperty(
-                PropertySpec.builder(
-                    "value",
-                    try {
-                        kotuleInterface.toClassName()
-                            .run {
-                                if (kotuleInterface.typeParameters.isNotEmpty())
-                                    parameterizedBy(kotuleInterface.typeParameters.map { arguments.find(it).toTypeName() })
-                                else this
-                            }
-                    }
-                    catch (e: Throwable) {
-                        throw RuntimeException("$kotuleInterface ${kotuleInterface.typeParameters} $arguments", e)
-                    }
-                )
-                    .addModifiers(KModifier.INTERNAL)
-                    .receiver(scope.resolveInPackage(name))
-                    .getter(
-                        FunSpec.getterBuilder()
-                            .addCode(buildString {
-                                append("return ")
-
-                                if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                                    append(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
-                                    append("(this)")
-                                }
-                                else {
-                                    append(kotuleInterface.toClassName().run { canonicalName.removePrefix(packageName + ".") })
-                                    append('(')
-                                    val params: List<KSValueParameter> = kotuleInterface.primaryConstructor?.parameters.orEmpty()
-                                    for ((index, param) in params.withIndex()) {
-                                        val type: KSType = param.type.resolve()
-                                        val actualType: KSType =
-                                            (type.declaration as? KSTypeParameter)?.let {
-                                                arguments.findOrNull(it)?.type?.resolve()
-                                            } ?: type
-
-                                        val qualifiedName: String = actualType.toClassName().canonicalName
-
-                                        append(param.name!!.asString())
-                                        if (!PRIMITIVE_TYPES.contains(qualifiedName)) {
-                                            if (type.isMarkedNullable) {
-                                                append('?')
-                                            }
-                                            append(".value")
-                                        }
-                                        else if (LIST_TYPES.contains(qualifiedName)) {
-                                            scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
-                                            if (type.isMarkedNullable) {
-                                                append('?')
-                                            }
-                                            append(".getListValue().map { it.value }")
-                                        }
-
-                                        if (index + 1 != params.size) {
-                                            append(", ")
-                                        }
-                                    }
-                                    append(')')
-                                }
-                            })
-                            .build()
-                    )
-                    .build()
-            )
         }.build()
 
     private fun TypeSpec.Builder.addProperties(

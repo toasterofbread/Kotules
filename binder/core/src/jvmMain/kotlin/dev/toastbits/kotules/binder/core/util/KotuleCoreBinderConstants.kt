@@ -6,13 +6,13 @@ object KotuleCoreBinderConstants {
     const val MAPPER_INSTANCE_NAME: String = "_instance"
 
     fun getInputMapperName(interfaceName: String): String =
-        "${interfaceName.replace('.', '_')}_InputMapper"
+        "${interfaceName.replace('.', '_')}_CoreInputMapper"
 
     fun getInputMapperName(kotuleInterface: KSClassDeclaration): String =
         getInputMapperName(kotuleInterface.qualifiedName!!.asString())
 
     fun getInputBindingName(interfaceName: String): String =
-        "${interfaceName.replace('.', '_')}_InputBinding"
+        "${interfaceName.replace('.', '_')}_CoreInputBinding"
 
     fun getInputBindingName(kotuleInterface: KSClassDeclaration): String =
         getInputBindingName(kotuleInterface.qualifiedName!!.asString())

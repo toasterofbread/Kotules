@@ -1,0 +1,122 @@
+package dev.toastbits.kotules.binder.runtime.generator
+
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeParameter
+import com.google.devtools.ksp.symbol.KSValueParameter
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
+import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
+import dev.toastbits.kotules.binder.core.util.getAllDeclarations
+import dev.toastbits.kotules.binder.core.util.isListType
+import dev.toastbits.kotules.binder.core.util.isPrimitiveType
+import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+
+class KotuleBindingInterfaceValueGetterGenerator(
+    private val scope: FileGenerator.Scope
+) {
+    fun generateGetter(
+        interfaceType: KSType,
+    ): String {
+        val kotuleInterface: KSClassDeclaration = interfaceType.declaration as KSClassDeclaration
+        val arguments: TypeArgumentInfo = TypeArgumentInfo(interfaceType.arguments, kotuleInterface.typeParameters)
+        val getterName: String = KotuleRuntimeBinderConstants.getInputBindingGetterName(kotuleInterface)
+
+        check(kotuleInterface.getAllDeclarations().none { it.asType(emptyList()).isPrimitiveType() }) {
+            "$interfaceType $kotuleInterface"
+        }
+
+        scope.generateNew(
+            ClassName(
+                scope.file.packageName,
+                "${kotuleInterface.qualifiedName!!.asString().replace('.', '_')}_$getterName"
+            )
+        ) {
+            this@generateNew.file.addProperty(
+                PropertySpec.Companion.builder(
+                    getterName,
+                    try {
+                        kotuleInterface.toClassName()
+                            .run {
+                                if (kotuleInterface.typeParameters.isNotEmpty())
+                                    parameterizedBy(kotuleInterface.typeParameters.map {
+                                        arguments.find(
+                                            it
+                                        ).toTypeName()
+                                    })
+                                else this
+                            }
+                    } catch (e: Throwable) {
+                        throw RuntimeException(
+                            "$kotuleInterface ${kotuleInterface.typeParameters} $arguments",
+                            e
+                        )
+                    }
+                )
+                    .addModifiers(KModifier.INTERNAL)
+                    .receiver(scope.importFromPackage(KotuleCoreBinderConstants.getInputBindingName(kotuleInterface)))
+                    .getter(
+                        FunSpec.getterBuilder()
+                            .addCode(buildString {
+                                append("return ")
+
+                                val interfaceAccessor: String =
+                                    kotuleInterface.toClassName().run { canonicalName.removePrefix(packageName + ".") }
+
+                                if (kotuleInterface.classKind == ClassKind.INTERFACE) {
+                                    append(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
+                                    append("(this)")
+                                }
+                                else if (kotuleInterface.classKind == ClassKind.ENUM_CLASS) {
+                                    append(interfaceAccessor)
+                                    append(".entries[${KotuleRuntimeBinderConstants.ENUM_BINDER_ORDINAL_PROPERTY_NAME}]")
+                                }
+                                else {
+                                    append(interfaceAccessor)
+                                    append('(')
+                                    val params: List<KSValueParameter> = kotuleInterface.primaryConstructor?.parameters.orEmpty()
+                                    for ((index, param) in params.withIndex()) {
+                                        val type: KSType = param.type.resolve()
+                                        val actualType: KSType =
+                                            (type.declaration as? KSTypeParameter)?.let {
+                                                arguments.findOrNull(it)?.type?.resolve()
+                                            } ?: type
+
+                                        append(param.name!!.asString())
+                                        if (!actualType.isPrimitiveType()) {
+                                            if (type.isMarkedNullable) {
+                                                append('?')
+                                            }
+
+                                            append(".${generateGetter(actualType)}")
+                                        }
+                                        else if (actualType.isListType()) {
+                                            scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
+                                            if (type.isMarkedNullable) {
+                                                append('?')
+                                            }
+                                            append(".getListValue().map { it.${generateGetter(actualType.arguments.single().type!!.resolve())} }")
+                                        }
+
+                                        if (index + 1 != params.size) {
+                                            append(", ")
+                                        }
+                                    }
+                                    append(')')
+                                }
+                            })
+                            .build()
+                    )
+                    .build()
+            )
+        }
+
+        return getterName
+    }
+}

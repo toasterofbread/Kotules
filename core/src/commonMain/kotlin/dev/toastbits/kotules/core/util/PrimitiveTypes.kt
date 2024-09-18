@@ -3,7 +3,10 @@ package dev.toastbits.kotules.core.util
 
 import kotlin.reflect.KClass
 
-val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
+fun KClass<*>.isPrimitive(): Boolean =
+    PRIMITIVE_TYPE_CLASSES.none { this.isInstance(it) }
+
+private val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
     listOf(
         Unit::class,
         Boolean::class,

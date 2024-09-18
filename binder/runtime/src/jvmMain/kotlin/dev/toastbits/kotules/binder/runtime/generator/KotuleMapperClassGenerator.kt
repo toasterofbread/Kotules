@@ -1,7 +1,6 @@
 package dev.toastbits.kotules.binder.runtime.generator
 
-import com.google.devtools.ksp.getDeclaredFunctions
-import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
@@ -17,13 +16,16 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
-import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
+import dev.toastbits.kotules.binder.core.util.getAbstractFunctions
+import dev.toastbits.kotules.binder.core.util.getAbstractProperties
+import dev.toastbits.kotules.binder.core.util.isListType
+import dev.toastbits.kotules.binder.core.util.isPrimitiveType
+import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.core.util.resolveTypeAliasQualifiedName
 import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
+import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.core.type.ValueType
-import dev.toastbits.kotules.core.util.LIST_TYPES
-import dev.toastbits.kotules.core.util.PRIMITIVE_TYPES
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.util.kotulesJsonInstance
@@ -62,8 +64,8 @@ class KotuleMapperClassGenerator(
             )
 
             addSuperinterface(kotuleInterface.toClassName())
-            addProperties(kotuleInterface.getDeclaredProperties())
-            addFunctions(kotuleInterface.getDeclaredFunctions())
+            addProperties(kotuleInterface.getAbstractProperties())
+            addFunctions(kotuleInterface.getAbstractFunctions())
         }.build()
 
     private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
@@ -207,9 +209,9 @@ class KotuleMapperClassGenerator(
             .build()
 
     private fun getFunctionParameterTransformSuffix(type: KSType): String = buildString {
-        val qualifiedName: String = type.resolveTypeAliasQualifiedName()
+        val resolvedType: KSType = type.resolveTypeAlias()
 
-        if (PRIMITIVE_TYPES.contains(qualifiedName)) {
+        if (resolvedType.isPrimitiveType()) {
             return@buildString
         }
 
@@ -222,6 +224,7 @@ class KotuleMapperClassGenerator(
             return@buildString
         }
 
+        val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
         if (qualifiedName.startsWith("kotlin.Function")) {
             val functionName: String = "lambda"
             val argumentPrefix: String = "arg"
@@ -261,7 +264,7 @@ class KotuleMapperClassGenerator(
         val typeDeclaration: KSClassDeclaration = type.declaration as KSClassDeclaration
         val bindingName: String = KotuleCoreBinderConstants.getInputBindingName(typeDeclaration)
         appendLine(".let { $bindingName().apply { ")
-        for (function in typeDeclaration.getDeclaredFunctions()) {
+        for (function in typeDeclaration.getAbstractFunctions()) {
             val functionName: String = function.simpleName.asString()
             appendLine("$functionName = it::$functionName")
         }
@@ -269,20 +272,24 @@ class KotuleMapperClassGenerator(
     }
 
     private fun getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
-        if (type.declaration.shouldBeSerialised()) {
+        val resolvedType: KSType = type.resolveTypeAlias()
+
+        if (resolvedType.declaration.shouldBeSerialised()) {
             val kotulesJsonInstance: String = (::kotulesJsonInstance).name
             scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
             append(".let { $kotulesJsonInstance.decodeFromString(it) }")
             return@buildString
         }
 
-        val qualifiedName: String = type.resolveTypeAliasQualifiedName()
-        if (LIST_TYPES.contains(qualifiedName)) {
+        if (resolvedType.isListType()) {
+            val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(type.arguments.single().type!!.resolve(), canBePrimitive)
             scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
-            append(".getListValue().map { it.value }")
+            append(".getListValue().map { it$valueSuffix }")
         }
-        else if (!canBePrimitive || !PRIMITIVE_TYPES.contains(qualifiedName)) {
-            append(".value")
+        else if (!canBePrimitive || !resolvedType.isPrimitiveType()) {
+            val getterName: String = KotuleBindingInterfaceValueGetterGenerator(scope)
+                .generateGetter(type)
+            append(".$getterName")
         }
     }
 }
