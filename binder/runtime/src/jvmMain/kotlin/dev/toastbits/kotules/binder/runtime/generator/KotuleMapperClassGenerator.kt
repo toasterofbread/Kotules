@@ -1,6 +1,5 @@
 package dev.toastbits.kotules.binder.runtime.generator
 
-import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
@@ -17,18 +16,26 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
-import dev.toastbits.kotules.binder.core.util.getAbstractFunctions
-import dev.toastbits.kotules.binder.core.util.getAbstractProperties
+import dev.toastbits.kotules.binder.core.util.getNeededFunctions
+import dev.toastbits.kotules.binder.core.util.getNeededProperties
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
-import dev.toastbits.kotules.binder.core.util.resolveTypeAliasQualifiedName
 import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.core.type.ValueType
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.util.kotulesJsonInstance
+
+fun FileGenerator.Scope.getMapper(kotuleInterface: KSClassDeclaration): ClassName {
+    val mapperName: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
+    return generateNew(mapperName) {
+        KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
+            this@generateNew.file.addType(it)
+        }
+    }
+}
 
 class KotuleMapperClassGenerator(
     private val scope: FileGenerator.Scope
@@ -64,8 +71,8 @@ class KotuleMapperClassGenerator(
             )
 
             addSuperinterface(kotuleInterface.toClassName())
-            addProperties(kotuleInterface.getAbstractProperties())
-            addFunctions(kotuleInterface.getAbstractFunctions())
+            addProperties(kotuleInterface.getNeededProperties())
+            addFunctions(kotuleInterface.getNeededFunctions())
         }.build()
 
     private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
@@ -76,7 +83,7 @@ class KotuleMapperClassGenerator(
                     property.type.toTypeName()
                 )
                     .apply {
-                        property.getter?.also { getter ->
+                        if (property.getter != null) {
                             getter(
                                 FunSpec.getterBuilder()
                                     .addCode(buildString {
@@ -86,9 +93,19 @@ class KotuleMapperClassGenerator(
                                     .build()
                             )
                         }
+                        if (property.setter != null) {
+                            mutable(true)
+                            setter(
+                                FunSpec.setterBuilder()
+                                    .addParameter("value", property.type.toTypeName())
+                                    .addCode(
+                                        "TODO(\"Property setter not supported\")"
+                                    )
+                                    .build()
+                            )
+                        }
                     }
                     .addModifiers(KModifier.OVERRIDE)
-//                    .addModifiers(property.modifiers.mapNotNull { it.toKModifier() })
                     .build()
             )
         }
@@ -231,18 +248,25 @@ class KotuleMapperClassGenerator(
 
             append(".let { $functionName -> { ")
 
-            val argCount: Int =
-                if (qualifiedName == "kotlin.Function") 0
-                else qualifiedName.removePrefix("kotlin.Function").toInt()
+            val argCount: Int = resolvedType.arguments.size - 1
 
             if (argCount > 0) {
                 for (arg in 0 until argCount) {
-                    append("$argumentPrefix$arg")
+                    append("$argumentPrefix$arg: ")
+
+                    val argType: KSType = resolvedType.arguments[arg].type!!.resolve()
+                    if (argType.isPrimitiveType()) {
+                        append(argType.toClassName().canonicalName)
+                    }
+                    else {
+                        append(KotuleCoreBinderConstants.getInputBindingName(argType.toClassName().canonicalName))
+                    }
+
                     if (arg + 1 != argCount) {
                         append(", ")
                     }
                 }
-                append(" ->")
+                append(" -> ")
             }
 
             append(functionName)
@@ -264,12 +288,23 @@ class KotuleMapperClassGenerator(
         val typeDeclaration: KSClassDeclaration = type.declaration as KSClassDeclaration
         val bindingName: String = KotuleCoreBinderConstants.getInputBindingName(typeDeclaration)
         appendLine(".let { $bindingName().apply { ")
-        for (function in typeDeclaration.getAbstractFunctions()) {
+
+        for (function in typeDeclaration.getNeededFunctions()) {
             val functionName: String = function.simpleName.asString()
             appendLine("$functionName = it::$functionName")
         }
+
+        for (property in typeDeclaration.getNeededProperties()) {
+            val propertyName: String = property.simpleName.asString()
+            val valueSuffix: String = getFunctionParameterTransformSuffix(property.type.resolve())
+            appendLine("$propertyName = it.$propertyName$valueSuffix")
+        }
+
         append(" } }")
     }
+
+    private val KSType.safeAccessPrefix: String
+        get() = if (isMarkedNullable) "?" else ""
 
     private fun getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
         val resolvedType: KSType = type.resolveTypeAlias()
@@ -277,18 +312,25 @@ class KotuleMapperClassGenerator(
         if (resolvedType.declaration.shouldBeSerialised()) {
             val kotulesJsonInstance: String = (::kotulesJsonInstance).name
             scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
+            append(resolvedType.safeAccessPrefix)
             append(".let { $kotulesJsonInstance.decodeFromString(it) }")
             return@buildString
         }
 
         if (resolvedType.isListType()) {
-            val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(type.arguments.single().type!!.resolve(), canBePrimitive)
+            val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(resolvedType.arguments.single().type!!.resolve(), canBePrimitive)
             scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
+            append(resolvedType.safeAccessPrefix)
             append(".getListValue().map { it$valueSuffix }")
+
+            when (resolvedType.toClassName().canonicalName) {
+                "kotlin.collections.Set" -> append(".toSet()")
+            }
         }
         else if (!canBePrimitive || !resolvedType.isPrimitiveType()) {
             val getterName: String = KotuleBindingInterfaceValueGetterGenerator(scope)
-                .generateGetter(type)
+                .generateGetter(resolvedType)
+            append(resolvedType.safeAccessPrefix)
             append(".$getterName")
         }
     }

@@ -1,5 +1,6 @@
 package dev.toastbits.kotules.binder.runtime.generator
 
+import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
@@ -69,8 +70,8 @@ class KotuleBindingInterfaceValueGetterGenerator(
                                 val interfaceAccessor: String =
                                     kotuleInterface.toClassName().run { canonicalName.removePrefix(packageName + ".") }
 
-                                if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                                    append(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
+                                if (kotuleInterface.isAbstract()) {
+                                    append(scope.getMapper(kotuleInterface).simpleName)
                                     append("(this)")
                                 }
                                 else if (kotuleInterface.classKind == ClassKind.ENUM_CLASS) {
@@ -97,7 +98,7 @@ class KotuleBindingInterfaceValueGetterGenerator(
                                             append(".${generateGetter(actualType)}")
                                         }
                                         else if (actualType.isListType()) {
-                                            scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
+                                            import("dev.toastbits.kotules.core.type.input", "getListValue")
                                             if (type.isMarkedNullable) {
                                                 append('?')
                                             }

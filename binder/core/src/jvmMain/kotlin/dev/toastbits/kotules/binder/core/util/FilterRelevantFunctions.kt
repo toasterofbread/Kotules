@@ -8,10 +8,10 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 
-fun KSClassDeclaration.getAbstractFunctions(): Sequence<KSFunctionDeclaration> =
-    getAllDeclarations().flatMap { it.getDeclaredFunctions() }.distinctBy { it.toString() }.asSequence().filterRelevantFunctions(this)
+fun KSClassDeclaration.getNeededFunctions(): Sequence<KSFunctionDeclaration> =
+    getAllDeclarations().flatMap { it.getDeclaredFunctions() }.filter { it.isAbstract }.distinctBy { it.toString() }.asSequence().filterRelevantFunctions(this)
 
-fun KSClassDeclaration.getAbstractProperties(): Sequence<KSPropertyDeclaration> =
+fun KSClassDeclaration.getNeededProperties(): Sequence<KSPropertyDeclaration> =
     getAllDeclarations().flatMap { it.getDeclaredProperties() }.distinctBy { it.simpleName.asString() }.asSequence()
 
 fun KSClassDeclaration.getAllDeclarations(): List<KSClassDeclaration> =

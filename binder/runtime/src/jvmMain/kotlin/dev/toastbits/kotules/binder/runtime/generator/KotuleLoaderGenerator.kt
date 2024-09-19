@@ -1,6 +1,7 @@
 package dev.toastbits.kotules.binder.runtime.generator
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
@@ -87,10 +88,10 @@ internal class KotuleLoaderGenerator(
                             )
                         )
                         .addCode(buildString {
-                            val mapperClass: String = KotuleCoreBinderConstants.getInputMapperName(kotuleInterface)
+                            val mapperClass: ClassName = scope.getMapper(kotuleInterface)
                             scope.import("dev.toastbits.kotules.runtime", "loadKotuleInputBindingFromKotlinJsCode")
 
-                            append("return $mapperClass(loadKotuleInputBindingFromKotlinJsCode(jsCode, implementationClass))")
+                            append("return ${mapperClass.simpleName}(loadKotuleInputBindingFromKotlinJsCode(jsCode, implementationClass))")
                         })
                         .build()
                 )

@@ -26,8 +26,8 @@ import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
-import dev.toastbits.kotules.binder.core.util.getAbstractFunctions
-import dev.toastbits.kotules.binder.core.util.getAbstractProperties
+import dev.toastbits.kotules.binder.core.util.getNeededFunctions
+import dev.toastbits.kotules.binder.core.util.getNeededProperties
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
@@ -157,12 +157,12 @@ internal class KotuleBindingInterfaceGenerator(
             }
             else if (kotuleInterface.isAbstract()) {
                 addProperties(
-                    kotuleInterface.getAbstractProperties().associate { it.simpleName.asString() to it.type.resolve() },
+                    kotuleInterface.getNeededProperties().associate { it.simpleName.asString() to (it.type.resolve() to (it.isMutable || mutableFunctions)) },
                     expectationModifier,
                     arguments
                 )
                 addFunctions(
-                    kotuleInterface.getAbstractFunctions(),
+                    kotuleInterface.getNeededFunctions(),
                     expectationModifier,
                     mutable = mutableFunctions,
                     arguments = arguments
@@ -170,28 +170,20 @@ internal class KotuleBindingInterfaceGenerator(
             }
             else {
                 addProperties(
-                    kotuleInterface.primaryConstructor?.parameters.orEmpty().associate { it.name!!.asString() to it.type.resolve() },
+                    kotuleInterface.primaryConstructor?.parameters.orEmpty().associate { it.name!!.asString() to (it.type.resolve() to mutableFunctions) },
                     expectationModifier,
                     arguments
                 )
             }
-
-            if (kotuleInterface.classKind == ClassKind.INTERFACE) {
-                val mapperName: ClassName = scope.resolveInPackage(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
-                scope.generateNew(mapperName) {
-                    KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
-                        this@generateNew.file.addType(it)
-                    }
-                }
-            }
         }.build()
 
     private fun TypeSpec.Builder.addProperties(
-        properties: Map<String, KSType>,
+        properties: Map<String, Pair<KSType, Boolean>>,
         expectationModifier: KModifier,
         arguments: TypeArgumentInfo
     ) {
-        for ((propertyName, propertyType) in properties) {
+        for ((propertyName, property) in properties) {
+            val (propertyType: KSType, mutable: Boolean) = property
             val outPropertyType: TypeName = scope.getOutputInteropTypeFor(propertyType, arguments, canBePrimitive = true)
 
             addProperty(
@@ -199,6 +191,7 @@ internal class KotuleBindingInterfaceGenerator(
                     propertyName,
                     outPropertyType.copy(nullable = propertyType.isMarkedNullable)
                 )
+                    .mutable(mutable)
                     .addModifiers(expectationModifier)
                     .build()
             )

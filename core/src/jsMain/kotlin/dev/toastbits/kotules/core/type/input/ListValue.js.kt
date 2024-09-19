@@ -3,7 +3,6 @@
 package dev.toastbits.kotules.core.type.input
 
 import dev.toastbits.kotules.core.type.ValueType
-import dev.toastbits.kotules.core.type.input.ListValue
 import kotlin.js.collections.JsArray
 import kotlin.js.collections.toList
 

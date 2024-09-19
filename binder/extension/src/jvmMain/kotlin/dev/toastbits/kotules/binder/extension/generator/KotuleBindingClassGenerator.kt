@@ -26,11 +26,10 @@ import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstant
 import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
-import dev.toastbits.kotules.binder.core.util.getAbstractFunctions
+import dev.toastbits.kotules.binder.core.util.getNeededFunctions
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
-import dev.toastbits.kotules.binder.core.util.resolveTypeAliasQualifiedName
 import dev.toastbits.kotules.extension.OutKotulePromise
 import dev.toastbits.kotules.extension.PlatformJsExport
 import dev.toastbits.kotules.extension.PlatformJsName
@@ -190,7 +189,7 @@ internal class KotuleBindingClassGenerator(
             )
 
             addFunctions(
-                kotuleClass.getAbstractFunctions(),
+                kotuleClass.getNeededFunctions(),
                 kotuleClass.isAbstract()
             )
         }.build()
