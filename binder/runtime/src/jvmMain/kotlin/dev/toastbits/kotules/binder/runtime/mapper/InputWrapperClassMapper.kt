@@ -9,7 +9,7 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.core.util.isListType
-import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
+import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 
 internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): TypeName? {

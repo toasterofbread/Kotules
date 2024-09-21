@@ -23,7 +23,7 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
-import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
+import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.binder.core.util.getNeededFunctions
@@ -184,7 +184,7 @@ internal class KotuleBindingClassGenerator(
             )
 
             addProperties(
-                kotuleClass.getAllProperties().associate { it.simpleName.asString() to it.type.resolve() },
+                kotuleClass.getAllProperties().associate { it.simpleName.asString() to it.type.resolve().resolveTypeAlias() },
                 kotuleClass.isAbstract()
             )
 
@@ -266,7 +266,12 @@ internal class KotuleBindingClassGenerator(
         else {
             append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
             append('(')
-            appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+            try {
+                appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+            }
+            catch (e: Throwable) {
+                throw RuntimeException(listItemType.toString(), e)
+            }
             append(')')
         }
         append(" }")

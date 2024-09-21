@@ -26,7 +26,7 @@ private val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
         EmptySet::class,
         Array::class,
         Sequence::class,
-        Function::class,
+        Function::class
     )
 
 val LIST_TYPES: Map<String, ListType> =
@@ -37,7 +37,7 @@ val LIST_TYPES: Map<String, ListType> =
         "kotlin.collections.Set" to ListType.SET,
         "kotlin.collections.EmptySet" to ListType.SET,
         "kotlin.Array" to ListType.ARRAY,
-        "kotlin.sequences.Sequence" to ListType.SEQUENCE,
+        "kotlin.sequences.Sequence" to ListType.SEQUENCE
     )
 
 enum class ListType {
@@ -45,6 +45,29 @@ enum class ListType {
     ARRAY,
     SEQUENCE,
     SET
+}
+
+enum class BuiltInType {
+    ByteArray {
+        override val qualifiedName = "kotlin.ByteArray"
+    },
+    IntRange {
+        override val qualifiedName = "kotlin.ranges.IntRange"
+    },
+    CharRange {
+        override val qualifiedName = "kotlin.ranges.CharRange"
+    },
+    LongRange {
+        override val qualifiedName = "kotlin.ranges.LongRange"
+    },
+    UIntRange {
+        override val qualifiedName = "kotlin.ranges.UIntRange"
+    },
+    ULongRange {
+        override val qualifiedName = "kotlin.ranges.ULongRange"
+    };
+
+    abstract val qualifiedName: String
 }
 
 val PRIMITIVE_TYPES: List<String> =
@@ -59,5 +82,5 @@ val PRIMITIVE_TYPES: List<String> =
         "kotlin.UShort",
         "kotlin.Long",
         "kotlin.ULong",
-        "kotlin.String",
+        "kotlin.String"
     ) + LIST_TYPES.keys + listOf("kotlin.Function") + (1..20).map { "kotlin.Function$it" }

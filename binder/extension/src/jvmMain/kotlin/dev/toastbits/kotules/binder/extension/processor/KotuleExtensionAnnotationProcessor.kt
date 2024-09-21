@@ -13,7 +13,7 @@ import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import dev.toastbits.kotules.binder.extension.generator.KotuleBindingClassGenerator
 import dev.toastbits.kotules.binder.extension.util.KotuleExtensionBinderConstants
-import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
+import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.extension.annotation.KotuleDefinition
 

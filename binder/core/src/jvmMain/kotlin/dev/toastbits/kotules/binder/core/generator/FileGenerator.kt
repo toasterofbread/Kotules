@@ -1,11 +1,10 @@
-package dev.toastbits.kotules.binder.runtime.generator
+package dev.toastbits.kotules.binder.core.generator
 
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.asTypeName
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.getSourceSetName

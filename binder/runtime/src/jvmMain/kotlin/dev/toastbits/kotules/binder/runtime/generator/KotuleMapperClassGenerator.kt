@@ -1,6 +1,7 @@
 package dev.toastbits.kotules.binder.runtime.generator
 
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
@@ -16,27 +17,34 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
+import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.core.util.getListType
 import dev.toastbits.kotules.binder.core.util.getNeededFunctions
 import dev.toastbits.kotules.binder.core.util.getNeededProperties
+import dev.toastbits.kotules.binder.core.util.getTypeWrapper
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
-import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
 import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.core.type.ValueType
 import dev.toastbits.kotules.core.util.ListType
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
-import dev.toastbits.kotules.extension.util.kotulesJsonInstance
 
 fun FileGenerator.Scope.getMapper(kotuleInterface: KSClassDeclaration): ClassName {
     val mapperName: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
     return generateNew(mapperName) {
-        KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
-            this@generateNew.file.addType(it)
+        if (kotuleInterface.modifiers.contains(Modifier.SEALED)) {
+            KotuleSealedClassMapperGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
+                this@generateNew.file.addFunction(it)
+            }
+        }
+        else {
+            KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
+                this@generateNew.file.addType(it)
+            }
         }
     }
 }
@@ -48,16 +56,18 @@ class KotuleMapperClassGenerator(
 
     fun generate(
         name: String,
-        kotuleInterface: KSClassDeclaration,
-        force: Boolean = false
+        kotuleInterface: KSClassDeclaration
     ): TypeSpec? =
-        if (!force && (scope.target == KmpTarget.COMMON || scope.target == KmpTarget.JVM)) null
+        if (scope.target == KmpTarget.COMMON || scope.target == KmpTarget.JVM) null
         else TypeSpec.classBuilder(name).apply {
-            val inputClassName: ClassName = scope.importFromPackage(
-                KotuleCoreBinderConstants.getInputBindingName(
-                    kotuleInterface
+            check(!kotuleInterface.modifiers.contains(Modifier.SEALED)) { kotuleInterface }
+
+            val inputClassName: ClassName =
+                scope.importFromPackage(
+                    KotuleCoreBinderConstants.getInputBindingName(
+                        kotuleInterface
+                    )
                 )
-            )
 
             addModifiers(KModifier.INTERNAL)
 
@@ -74,7 +84,13 @@ class KotuleMapperClassGenerator(
                     .build()
             )
 
-            addSuperinterface(kotuleInterface.toClassName())
+            if (kotuleInterface.classKind == ClassKind.INTERFACE) {
+                addSuperinterface(kotuleInterface.toClassName())
+            }
+            else {
+                superclass(kotuleInterface.toClassName())
+            }
+
             addProperties(kotuleInterface.getNeededProperties())
             addFunctions(kotuleInterface.getNeededFunctions())
         }.build()
@@ -282,14 +298,11 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(
 
 fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
     val resolvedType: KSType = type.resolveTypeAlias()
-    val safeAccessPrefix: String =
-        if (type.isMarkedNullable) "?"
-        else ""
 
     if (resolvedType.isPrimitiveType()) {
         if (resolvedType.isListType()) {
             import("dev.toastbits.kotules.core.type.input", "createListValue")
-            appendLine("$safeAccessPrefix.let {")
+            appendLine("${resolvedType.safeAccessPrefix}.let {")
             appendLine("    createListValue(")
             appendLine("        it.map {")
             appendLine("            it${getFunctionParameterTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false)}")
@@ -301,18 +314,15 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBeP
         }
         else if (!canBePrimitive) {
             val wrapper: TypeName = resolvedType.getBuiltInInputWrapperClass(this@getFunctionParameterTransformSuffix)!!
-            append("$safeAccessPrefix.let { $wrapper(it) }")
+            append("${resolvedType.safeAccessPrefix}.let { $wrapper(it) }")
         }
 
         return@buildString
     }
 
-    if (type.declaration.shouldBeSerialised()) {
-        val kotulesJsonInstance: String = (::kotulesJsonInstance).name
-        import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
-        import("kotlinx.serialization", "encodeToString")
-
-        append("$safeAccessPrefix.let { $kotulesJsonInstance.encodeToString(it) }")
+    resolvedType.declaration.getTypeWrapper()?.also { typeWrapper ->
+        append(resolvedType.safeAccessPrefix)
+        append(typeWrapper.wrap(this@getFunctionParameterTransformSuffix))
         return@buildString
     }
 
@@ -324,17 +334,15 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBeP
 
     val typeDeclaration: KSClassDeclaration = resolvedType.declaration as KSClassDeclaration
     val binding: ClassName = getInputBinding(typeDeclaration, TypeArgumentInfo())
-    appendLine("$safeAccessPrefix.let { ${binding.simpleName}(it) }")
+    appendLine("${resolvedType.safeAccessPrefix}.let { ${binding.simpleName}(it) }")
 }
 
 private fun FileGenerator.Scope.getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
     val resolvedType: KSType = type.resolveTypeAlias()
 
-    if (resolvedType.declaration.shouldBeSerialised()) {
-        val kotulesJsonInstance: String = (::kotulesJsonInstance).name
-        import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
+    resolvedType.declaration.getTypeWrapper()?.also { typeWrapper ->
         append(resolvedType.safeAccessPrefix)
-        append(".let { $kotulesJsonInstance.decodeFromString(it) }")
+        append(typeWrapper.unwrap(this@getPropertyOrFunctionValueTransformSuffix))
         return@buildString
     }
 

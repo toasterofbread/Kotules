@@ -15,7 +15,7 @@ import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toClassName
-import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
+import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.generator.KotuleBindingInterfaceGenerator
 import dev.toastbits.kotules.binder.runtime.generator.KotuleLoaderGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
