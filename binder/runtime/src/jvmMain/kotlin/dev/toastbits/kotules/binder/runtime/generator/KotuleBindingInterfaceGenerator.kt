@@ -9,6 +9,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
+import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
@@ -40,15 +41,39 @@ import dev.toastbits.kotules.core.type.ValueType
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.runtime.KotuleInputBinding
 
+fun FileGenerator.Scope.getInputBinding(kotuleInterface: KSClassDeclaration, arguments: TypeArgumentInfo): ClassName {
+    lateinit var ret: ClassName
+    for (target in KmpTarget.entries) {
+        val bindingName: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputBindingName(kotuleInterface))
+        ret = generateNew(bindingName, target = target) {
+            interfaceGenerator.generate(bindingName.simpleName, kotuleInterface, mutableFunctions = true, arguments = arguments)?.also {
+                this@generateNew.file.addType(it)
+            }
+        }
+    }
+    return ret
+}
+
 data class TypeArgumentInfo(
-    val args: List<KSTypeArgument> = emptyList(),
+    val args: List<KSTypeReference?> = emptyList(),
     val parameters: List<KSTypeParameter> = emptyList()
 ) {
-    fun findOrNull(param: KSTypeParameter): KSTypeArgument? =
+    fun findOrNull(param: KSTypeParameter): KSTypeReference? =
         args.getOrNull(parameters.indexOf(param))
 
-    fun find(param: KSTypeParameter): KSTypeArgument =
+    fun find(param: KSTypeParameter): KSTypeReference =
         findOrNull(param) ?: throw NullPointerException(param.toString())
+
+    fun withBounds(): TypeArgumentInfo =
+        copy(args = parameters.map { it.bounds.single() })
+
+    companion object {
+        fun from(
+            args: List<KSTypeArgument>,
+            parameters: List<KSTypeParameter>
+        ): TypeArgumentInfo =
+            TypeArgumentInfo(args.map { it.type }, parameters)
+    }
 }
 
 private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, arguments: TypeArgumentInfo, canBePrimitive: Boolean = false): TypeName {
@@ -73,7 +98,7 @@ private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, arguments:
     val typeDeclaration: KSClassDeclaration =
         when (declaration) {
             is KSClassDeclaration -> declaration
-            is KSTypeParameter -> arguments.find(declaration).type!!.resolve().declaration as KSClassDeclaration
+            is KSTypeParameter -> arguments.find(declaration).resolve().declaration as KSClassDeclaration
             else -> throw NotImplementedError("$type $resolvedType $arguments (${declaration::class})")
         }
 
@@ -85,7 +110,7 @@ private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, arguments:
             typeClass.simpleName,
             typeDeclaration,
             true,
-            TypeArgumentInfo(resolvedType.arguments, declaration.typeParameters)
+            TypeArgumentInfo.from(resolvedType.arguments, declaration.typeParameters)
         )?.also {
             file.addType(it)
         }
@@ -99,6 +124,14 @@ private fun FileGenerator.Scope.getFunctionInteropType(type: KSType, arguments: 
         }
     )
 
+fun KSTypeReference.resolve(arguments: TypeArgumentInfo): KSType {
+    var resolved: KSType = resolve()
+    while (resolved.declaration is KSTypeParameter) {
+        resolved = arguments.find(resolved.declaration as KSTypeParameter).resolve()
+    }
+    return resolved
+}
+
 internal class KotuleBindingInterfaceGenerator(
     private val scope: FileGenerator.Scope
 ) {
@@ -111,17 +144,108 @@ internal class KotuleBindingInterfaceGenerator(
         if (scope.target != KmpTarget.COMMON && !scope.target.isWeb()) null
         else TypeSpec.interfaceBuilder(name).apply {
             scope.generateNew(ClassName(scope.file.packageName, name + "_Constructor")) {
+                val createFunctionName: String = "createObject"
+                val instanceParamName: String = "instance"
+
+                if (scope.target != KmpTarget.COMMON) {
+                    file.addFunction(
+                        FunSpec.builder(createFunctionName)
+                            .apply {
+                                returns(ClassName(scope.file.packageName, name))
+                                addModifiers(KModifier.PRIVATE)
+
+                                val argPrefix: String = "arg"
+                                var arg: Int = 0
+
+                                for (function in kotuleInterface.getNeededFunctions()) {
+                                    val returnType: KSType = function.returnType!!.resolve()
+                                    val type: TypeName =
+                                        LambdaTypeName.get(
+                                            returnType =
+                                                getOutputInteropTypeFor(returnType, arguments.withBounds(), true).copy(nullable = returnType.isMarkedNullable),
+                                            parameters =
+                                                function.parameters.map {
+                                                    ParameterSpec.unnamed(getOutputInteropTypeFor(it.type.resolve(), arguments.withBounds(), true))
+                                                }
+                                        )
+
+                                    addParameter("$argPrefix${arg++}", type)
+                                }
+
+                                for (property in kotuleInterface.getNeededProperties()) {
+                                    val type: KSType = property.type.resolve()
+                                    val interopType: TypeName = getOutputInteropTypeFor(type, arguments.withBounds(), true).copy(nullable = type.isMarkedNullable)
+                                    addParameter("$argPrefix${arg++}", interopType)
+                                }
+
+                                addCode(buildString {
+                                    appendLine("return js(\"\"\"({")
+
+                                    arg = 0
+                                    for (function in kotuleInterface.getNeededFunctions()) {
+                                        val functionName: String = function.simpleName.asString()
+                                        appendLine("$functionName: $argPrefix${arg++}")
+                                    }
+
+                                    for (property in kotuleInterface.getNeededProperties()) {
+                                        val propertyName: String = property.simpleName.asString()
+                                        appendLine("$propertyName: $argPrefix${arg++}")
+                                    }
+
+                                    appendLine("})\"\"\")")
+                                })
+                            }
+                            .build()
+                    )
+                }
+
                 file.addFunction(
                     FunSpec.builder(name)
                         .apply {
                             returns(ClassName(scope.file.packageName, name))
                             addModifiers(KModifier.INTERNAL)
+                            addParameter(
+                                instanceParamName,
+                                kotuleInterface.toClassName()
+                                    .run {
+                                        if (kotuleInterface.typeParameters.isNotEmpty())
+                                            parameterizedBy(kotuleInterface.typeParameters.map {
+                                                it.bounds.single().toTypeName()
+                                            })
+                                        else this
+                                    }
+                            )
+
                             if (scope.target == KmpTarget.COMMON) {
                                 addModifiers(KModifier.EXPECT)
                             }
                             else {
                                 addModifiers(KModifier.ACTUAL)
-                                addCode("return js(\"({})\")")
+                                addCode(buildString {
+                                    appendLine("return $createFunctionName(")
+
+                                    for (function in kotuleInterface.getNeededFunctions()) {
+                                        val functionName: String = function.simpleName.asString()
+                                        val valueSuffix: String =
+                                            getFunctionParameterTransformSuffix(
+                                                function.parameters.map {
+                                                    it.type.resolve(arguments.withBounds())
+                                                        .resolveTypeAlias()
+                                                },
+                                                function.returnType?.resolve(arguments)?.resolveTypeAlias(),
+                                                addArgumentTypes = false
+                                            )
+                                        appendLine("$instanceParamName::$functionName$valueSuffix,")
+                                    }
+
+                                    for (property in kotuleInterface.getNeededProperties()) {
+                                        val propertyName: String = property.simpleName.asString()
+                                        val valueSuffix: String = getFunctionParameterTransformSuffix(property.type.resolve(arguments.withBounds()), true)
+                                        appendLine("$instanceParamName.$propertyName$valueSuffix,")
+                                    }
+
+                                    appendLine(")")
+                                })
                             }
                         }
                         .build()
@@ -224,13 +348,14 @@ internal class KotuleBindingInterfaceGenerator(
             val functionName: String = function.simpleName.asString()
             val functionParameters: List<ParameterSpec> =
                 function.parameters.map {
+                    val type: KSType = it.type.resolve()
                     ParameterSpec.builder(
                         it.name!!.asString(),
                         scope.getOutputInteropTypeFor(
-                            it.type.resolve(),
+                            type,
                             arguments,
                             canBePrimitive = true
-                        )
+                        ).copy(nullable = type.isMarkedNullable)
                     ).build()
                 }
 

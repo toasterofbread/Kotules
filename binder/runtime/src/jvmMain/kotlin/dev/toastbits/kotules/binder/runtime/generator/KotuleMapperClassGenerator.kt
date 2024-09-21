@@ -11,19 +11,23 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
+import dev.toastbits.kotules.binder.core.util.getListType
 import dev.toastbits.kotules.binder.core.util.getNeededFunctions
 import dev.toastbits.kotules.binder.core.util.getNeededProperties
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
 import dev.toastbits.kotules.binder.core.util.shouldBeSerialised
+import dev.toastbits.kotules.binder.runtime.mapper.getBuiltInInputWrapperClass
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.core.type.ValueType
+import dev.toastbits.kotules.core.util.ListType
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 import dev.toastbits.kotules.extension.util.kotulesJsonInstance
@@ -88,7 +92,7 @@ class KotuleMapperClassGenerator(
                                 FunSpec.getterBuilder()
                                     .addCode(buildString {
                                         append("return $instanceName.${property.simpleName.asString()}")
-                                        append(getPropertyOrFunctionValueTransformSuffix(property.type.resolve(), true))
+                                        append(scope.getPropertyOrFunctionValueTransformSuffix(property.type.resolve(), true))
                                     })
                                     .build()
                             )
@@ -162,7 +166,7 @@ class KotuleMapperClassGenerator(
     ) {
         val paramTransforms: List<String?> =
             function.parameters.map { param ->
-                getFunctionParameterTransformSuffix(param.type.resolve()).ifBlank { null }
+                scope.getFunctionParameterTransformSuffix(param.type.resolve(), true).ifBlank { null }
             }
 
         val paramNamePrefix: String = "_parameter"
@@ -193,7 +197,7 @@ class KotuleMapperClassGenerator(
         append(resultTransform)
 
         if (returnType != null) {
-            append(getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), canBePrimitive))
+            append(scope.getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), canBePrimitive))
         }
     }
     
@@ -224,114 +228,140 @@ class KotuleMapperClassGenerator(
                 )
             }
             .build()
+}
 
-    private fun getFunctionParameterTransformSuffix(type: KSType): String = buildString {
-        val resolvedType: KSType = type.resolveTypeAlias()
+fun FileGenerator.Scope.getFunctionParameterTransformSuffix(
+    parameters: List<KSType>,
+    returnType: KSType?,
+    addArgumentTypes: Boolean = true
+): String = buildString {
+    val functionName: String = "lambda"
+    val argumentPrefix: String = "arg"
 
-        if (resolvedType.isPrimitiveType()) {
-            return@buildString
-        }
+    append(".let { $functionName -> { ")
 
-        if (type.declaration.shouldBeSerialised()) {
-            val kotulesJsonInstance: String = (::kotulesJsonInstance).name
-            scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
-            scope.import("kotlinx.serialization", "encodeToString")
+    if (parameters.isNotEmpty()) {
+        for ((index, param) in parameters.withIndex()) {
+            append("$argumentPrefix$index")
 
-            append(".let { $kotulesJsonInstance.encodeToString(it) }")
-            return@buildString
-        }
-
-        val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
-        if (qualifiedName.startsWith("kotlin.Function")) {
-            val functionName: String = "lambda"
-            val argumentPrefix: String = "arg"
-
-            append(".let { $functionName -> { ")
-
-            val argCount: Int = resolvedType.arguments.size - 1
-
-            if (argCount > 0) {
-                for (arg in 0 until argCount) {
-                    append("$argumentPrefix$arg: ")
-
-                    val argType: KSType = resolvedType.arguments[arg].type!!.resolve()
-                    if (argType.isPrimitiveType()) {
-                        append(argType.toClassName().canonicalName)
-                    }
-                    else {
-                        append(KotuleCoreBinderConstants.getInputBindingName(argType.toClassName().canonicalName))
-                    }
-
-                    if (arg + 1 != argCount) {
-                        append(", ")
-                    }
+            if (addArgumentTypes) {
+                append(": ")
+                if (param.isPrimitiveType()) {
+                    append(param.toClassName().canonicalName)
                 }
-                append(" -> ")
-            }
-
-            append(functionName)
-            append('(')
-            for (arg in 0 until argCount) {
-                append("$argumentPrefix$arg")
-                append(getPropertyOrFunctionValueTransformSuffix(type.arguments[arg].type!!.resolve(), true))
-
-                if (arg + 1 != argCount) {
-                    append(", ")
+                else {
+                    append(KotuleCoreBinderConstants.getInputBindingName(param.toClassName().canonicalName))
                 }
             }
-            append(')')
 
-            append(" } }")
-            return@buildString
+            if (index + 1 != parameters.size) {
+                append(", ")
+            }
         }
-
-        val typeDeclaration: KSClassDeclaration = type.declaration as KSClassDeclaration
-        val bindingName: String = KotuleCoreBinderConstants.getInputBindingName(typeDeclaration)
-        appendLine(".let { $bindingName().apply { ")
-
-        for (function in typeDeclaration.getNeededFunctions()) {
-            val functionName: String = function.simpleName.asString()
-            appendLine("$functionName = it::$functionName")
-        }
-
-        for (property in typeDeclaration.getNeededProperties()) {
-            val propertyName: String = property.simpleName.asString()
-            val valueSuffix: String = getFunctionParameterTransformSuffix(property.type.resolve())
-            appendLine("$propertyName = it.$propertyName$valueSuffix")
-        }
-
-        append(" } }")
+        append(" -> ")
     }
 
-    private val KSType.safeAccessPrefix: String
-        get() = if (isMarkedNullable) "?" else ""
+    append(functionName)
+    append('(')
+    for ((index, param) in parameters.withIndex()) {
+        append("$argumentPrefix$index")
+        append(getPropertyOrFunctionValueTransformSuffix(param, true))
 
-    private fun getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
-        val resolvedType: KSType = type.resolveTypeAlias()
-
-        if (resolvedType.declaration.shouldBeSerialised()) {
-            val kotulesJsonInstance: String = (::kotulesJsonInstance).name
-            scope.import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
-            append(resolvedType.safeAccessPrefix)
-            append(".let { $kotulesJsonInstance.decodeFromString(it) }")
-            return@buildString
+        if (index + 1 != parameters.size) {
+            append(", ")
         }
+    }
+    append(')')
 
+    if (returnType != null) {
+        append(getFunctionParameterTransformSuffix(returnType, true))
+    }
+
+    append(" } }")
+}
+
+fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
+    val resolvedType: KSType = type.resolveTypeAlias()
+    val safeAccessPrefix: String =
+        if (type.isMarkedNullable) "?"
+        else ""
+
+    if (resolvedType.isPrimitiveType()) {
         if (resolvedType.isListType()) {
-            val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(resolvedType.arguments.single().type!!.resolve(), canBePrimitive)
-            scope.import("dev.toastbits.kotules.core.type.input", "getListValue")
-            append(resolvedType.safeAccessPrefix)
-            append(".getListValue().map { it$valueSuffix }")
-
-            when (resolvedType.toClassName().canonicalName) {
-                "kotlin.collections.Set" -> append(".toSet()")
+            import("dev.toastbits.kotules.core.type.input", "createListValue")
+            appendLine("$safeAccessPrefix.let {")
+            appendLine("    createListValue(")
+            appendLine("        it.map {")
+            appendLine("            it${getFunctionParameterTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false)}")
+            append("        }")
+            if (!resolvedType.isListType(true)) {
+                append(".toList()")
             }
+            append("\n    )\n}")
         }
-        else if (!canBePrimitive || !resolvedType.isPrimitiveType()) {
-            val getterName: String = KotuleBindingInterfaceValueGetterGenerator(scope)
-                .generateGetter(resolvedType)
-            append(resolvedType.safeAccessPrefix)
-            append(".$getterName")
+        else if (!canBePrimitive) {
+            val wrapper: TypeName = resolvedType.getBuiltInInputWrapperClass(this@getFunctionParameterTransformSuffix)!!
+            append("$safeAccessPrefix.let { $wrapper(it) }")
         }
+
+        return@buildString
+    }
+
+    if (type.declaration.shouldBeSerialised()) {
+        val kotulesJsonInstance: String = (::kotulesJsonInstance).name
+        import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
+        import("kotlinx.serialization", "encodeToString")
+
+        append("$safeAccessPrefix.let { $kotulesJsonInstance.encodeToString(it) }")
+        return@buildString
+    }
+
+    val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
+    if (qualifiedName.startsWith("kotlin.Function")) {
+        val args: List<KSType> = resolvedType.arguments.map { it.type!!.resolve().resolveTypeAlias() }
+        getFunctionParameterTransformSuffix(args.dropLast(1), args.last())
+    }
+
+    val typeDeclaration: KSClassDeclaration = resolvedType.declaration as KSClassDeclaration
+    val binding: ClassName = getInputBinding(typeDeclaration, TypeArgumentInfo())
+    appendLine("$safeAccessPrefix.let { ${binding.simpleName}(it) }")
+}
+
+private fun FileGenerator.Scope.getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
+    val resolvedType: KSType = type.resolveTypeAlias()
+
+    if (resolvedType.declaration.shouldBeSerialised()) {
+        val kotulesJsonInstance: String = (::kotulesJsonInstance).name
+        import("dev.toastbits.kotules.extension.util", kotulesJsonInstance)
+        append(resolvedType.safeAccessPrefix)
+        append(".let { $kotulesJsonInstance.decodeFromString(it) }")
+        return@buildString
+    }
+
+    val listType: ListType? = resolvedType.getListType()
+    if (listType != null) {
+        val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false)
+        import("dev.toastbits.kotules.core.type.input", "getListValue")
+        append(resolvedType.safeAccessPrefix)
+        append(".getListValue().map { it$valueSuffix }")
+
+        when (listType) {
+            ListType.LIST -> {}
+            ListType.ARRAY -> append(".toTypedArray()")
+            ListType.SEQUENCE -> append(".asSequence()")
+            ListType.SET -> append(".toSet()")
+        }
+    }
+    else if (!resolvedType.isPrimitiveType()) {
+        val getterName: String = KotuleBindingInterfaceValueGetterGenerator(this@getPropertyOrFunctionValueTransformSuffix)
+            .generateGetter(resolvedType)
+        append(resolvedType.safeAccessPrefix)
+        append(".$getterName")
+    }
+    else if (!canBePrimitive) {
+        append(".value")
     }
 }
+
+private val KSType.safeAccessPrefix: String
+    get() = if (isMarkedNullable) "?" else ""

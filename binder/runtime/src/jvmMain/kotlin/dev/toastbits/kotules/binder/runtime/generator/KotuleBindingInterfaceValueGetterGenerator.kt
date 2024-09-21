@@ -15,9 +15,11 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.core.util.getAllDeclarations
+import dev.toastbits.kotules.binder.core.util.getListType
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
+import dev.toastbits.kotules.core.util.ListType
 
 class KotuleBindingInterfaceValueGetterGenerator(
     private val scope: FileGenerator.Scope
@@ -26,7 +28,7 @@ class KotuleBindingInterfaceValueGetterGenerator(
         interfaceType: KSType,
     ): String {
         val kotuleInterface: KSClassDeclaration = interfaceType.declaration as KSClassDeclaration
-        val arguments: TypeArgumentInfo = TypeArgumentInfo(interfaceType.arguments, kotuleInterface.typeParameters)
+        val arguments: TypeArgumentInfo = TypeArgumentInfo.from(interfaceType.arguments, kotuleInterface.typeParameters)
         val getterName: String = KotuleRuntimeBinderConstants.getInputBindingGetterName(kotuleInterface)
 
         check(kotuleInterface.getAllDeclarations().none { it.asType(emptyList()).isPrimitiveType() }) {
@@ -86,7 +88,7 @@ class KotuleBindingInterfaceValueGetterGenerator(
                                         val type: KSType = param.type.resolve()
                                         val actualType: KSType =
                                             (type.declaration as? KSTypeParameter)?.let {
-                                                arguments.findOrNull(it)?.type?.resolve()
+                                                arguments.findOrNull(it)?.resolve()
                                             } ?: type
 
                                         append(param.name!!.asString())
@@ -97,12 +99,22 @@ class KotuleBindingInterfaceValueGetterGenerator(
 
                                             append(".${generateGetter(actualType)}")
                                         }
-                                        else if (actualType.isListType()) {
-                                            import("dev.toastbits.kotules.core.type.input", "getListValue")
-                                            if (type.isMarkedNullable) {
-                                                append('?')
+                                        else {
+                                            val listType: ListType? = actualType.getListType()
+                                            if (listType != null) {
+                                                import("dev.toastbits.kotules.core.type.input", "getListValue")
+                                                if (type.isMarkedNullable) {
+                                                    append('?')
+                                                }
+                                                append(".getListValue().map { it.${generateGetter(actualType.arguments.single().type!!.resolve())} }")
+
+                                                when (listType) {
+                                                    ListType.LIST -> {}
+                                                    ListType.ARRAY -> append(".toTypedArray()")
+                                                    ListType.SEQUENCE -> append(".asSequence()")
+                                                    ListType.SET -> append(".toSet()")
+                                                }
                                             }
-                                            append(".getListValue().map { it.${generateGetter(actualType.arguments.single().type!!.resolve())} }")
                                         }
 
                                         if (index + 1 != params.size) {

@@ -262,7 +262,8 @@ internal class KotuleBindingClassGenerator(
         append(".map { ")
         if (listItemIsPrimitive) {
             append("${scope.OutValue}(it)")
-        } else {
+        }
+        else {
             append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
             append('(')
             appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }

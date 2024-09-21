@@ -20,7 +20,7 @@ fun KSClassDeclaration.getAllDeclarations(): List<KSClassDeclaration> =
 private fun Sequence<KSFunctionDeclaration>.filterRelevantFunctions(kotuleClass: KSClassDeclaration): Sequence<KSFunctionDeclaration> =
     filter { function ->
         val functionName: String = function.simpleName.asString()
-        if (Any::class.java.declaredMethods.any { it.name == functionName }) {
+        if ((Any::class.java.declaredMethods + Enum::class.java.declaredMethods).any { it.name == functionName }) {
             return@filter false
         }
 

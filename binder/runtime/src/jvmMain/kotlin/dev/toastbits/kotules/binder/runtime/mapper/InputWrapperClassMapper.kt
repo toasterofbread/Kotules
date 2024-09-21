@@ -1,19 +1,16 @@
 package dev.toastbits.kotules.binder.runtime.mapper
 
-import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
-import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
-import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.core.util.isListType
+import dev.toastbits.kotules.binder.runtime.generator.FileGenerator
+import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 
 internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): TypeName? {
     if (isListType()) {

@@ -29,16 +29,23 @@ private val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
         Function::class,
     )
 
-val LIST_TYPES: List<String> =
-    listOf(
-        "kotlin.collections.List",
-        "kotlin.collections.ArrayList",
-        "kotlin.collections.EmptyList",
-        "kotlin.collections.Set",
-        "kotlin.collections.EmptySet",
-        "kotlin.Array",
-        "kotlin.sequences.Sequence"
+val LIST_TYPES: Map<String, ListType> =
+    mapOf(
+        "kotlin.collections.List" to ListType.LIST,
+        "kotlin.collections.ArrayList" to ListType.LIST,
+        "kotlin.collections.EmptyList" to ListType.LIST,
+        "kotlin.collections.Set" to ListType.SET,
+        "kotlin.collections.EmptySet" to ListType.SET,
+        "kotlin.Array" to ListType.ARRAY,
+        "kotlin.sequences.Sequence" to ListType.SEQUENCE,
     )
+
+enum class ListType {
+    LIST,
+    ARRAY,
+    SEQUENCE,
+    SET
+}
 
 val PRIMITIVE_TYPES: List<String> =
     listOf(
@@ -53,4 +60,4 @@ val PRIMITIVE_TYPES: List<String> =
         "kotlin.Long",
         "kotlin.ULong",
         "kotlin.String",
-    ) + LIST_TYPES
+    ) + LIST_TYPES.keys + listOf("kotlin.Function") + (1..20).map { "kotlin.Function$it" }
