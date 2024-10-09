@@ -4,7 +4,7 @@ package dev.toastbits.kotules.core.util
 import kotlin.reflect.KClass
 
 fun KClass<*>.isPrimitive(): Boolean =
-    PRIMITIVE_TYPE_CLASSES.none { this.isInstance(it) }
+    PRIMITIVE_TYPE_CLASSES.any { this.isInstance(it) }
 
 private val PRIMITIVE_TYPE_CLASSES: List<KClass<*>> =
     listOf(

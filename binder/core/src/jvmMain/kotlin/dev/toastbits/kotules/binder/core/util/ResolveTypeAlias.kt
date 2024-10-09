@@ -11,11 +11,11 @@ fun KSType.resolveTypeAlias(): KSType {
         if (declaration is KSTypeAlias) {
             type = declaration.type.resolve()
         }
+        else if (isMarkedNullable) {
+            return type.makeNullable()
+        }
         else {
             return type
         }
     }
 }
-
-fun KSType.resolveTypeAliasQualifiedName(): String =
-    resolveTypeAlias().declaration.qualifiedName!!.asString()

@@ -15,5 +15,5 @@ actual suspend fun loadSampleKotule(): SampleKotule {
 
     println("Loading SampleKotule in JS code at '${SampleConfig.EXTENSION_IMPL_CLASS}'")
 
-    return SampleKotule_Loader.loadFromKotlinJsCode(response.bodyAsText(), SampleConfig.EXTENSION_IMPL_CLASS)
+    return SampleKotule::class.getLoader().loadFromKotlinJsCode(response.bodyAsText(), SampleConfig.EXTENSION_IMPL_CLASS)
 }

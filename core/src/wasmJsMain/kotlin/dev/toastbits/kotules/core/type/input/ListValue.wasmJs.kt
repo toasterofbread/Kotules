@@ -22,6 +22,12 @@ actual fun <T : ValueType?> createListValue(items: List<T>): ListValue<T> =
     )
 
 actual fun <T: ValueType?> ListValue<T>.getListValue(): List<T> {
+    println("getListValue 1")
+    println("getListValue 2 $this")
+    println("getListValue 3 ${this::class}")
+    println("getListValue 4 $arrayValue")
+    println("getListValue 5 ${arrayValue::class}")
+
     if (arrayValue.length == 0 && arrayValue.toString().let { it.isNotBlank() && it != "[]" }) {
         throw RuntimeException("JsArray value within ListValue is not empty but has an imported length of zero ($arrayValue)")
     }

@@ -10,21 +10,22 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.generator.FileGenerator
+import dev.toastbits.kotules.binder.runtime.generator.TypeArgumentInfo
 import dev.toastbits.kotules.binder.runtime.processor.interfaceGenerator
 
-internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope): TypeName? {
+internal fun KSType.getBuiltInInputWrapperClass(scope: FileGenerator.Scope, typeArguments: TypeArgumentInfo): TypeName? {
     if (isListType()) {
         return getValueClassName("ListValue")
             .parameterizedBy(arguments.map { arg ->
                 val type: KSType = arg.type!!.resolve()
-                type.getBuiltInInputWrapperClass(scope)?.also { return@map it }
+                type.getBuiltInInputWrapperClass(scope, typeArguments)?.also { return@map it }
 
                 val declaration: KSDeclaration = type.declaration
                 check(declaration is KSClassDeclaration) { declaration }
 
                 val typeClass: ClassName = scope.importFromPackage(KotuleCoreBinderConstants.getInputBindingName(type.toClassName().canonicalName))
                 scope.generateNew(typeClass) {
-                    interfaceGenerator.generate(typeClass.simpleName, declaration, true)?.also {
+                    interfaceGenerator.generate(typeClass.simpleName, declaration, true, typeArguments)?.also {
                         file.addType(it)
                     }
                 }

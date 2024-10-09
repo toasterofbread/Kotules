@@ -36,11 +36,11 @@ object TODOTypeWrapper: TypeWrapper {
     override val wrapperType: ClassName = ClassName("dev.toastbits.kotules.core.type.input", "ByteArrayValue")
 
     override fun wrap(scope: FileGenerator.Scope): String {
-        return ".let { TODO() }"
+        return ".let { TODO(\"2\") }"
     }
 
     override fun unwrap(scope: FileGenerator.Scope): String {
-        return ".let { TODO() }"
+        return ".let { TODO(\"3\") }"
     }
 }
 

@@ -9,19 +9,29 @@ actual interface KotuleLoader<T: Kotule> {
     fun loadFromKotlinJsCode(jsCode: String, implementationClass: String): T
 }
 
-fun <T: KotuleInputBinding> loadKotuleInputBindingFromKotlinJsCode(jsCode: String, implementationClass: String): T {
+@Suppress("unused")
+fun <T: KotuleInputBinding> loadKotuleInputBindingFromKotlinJsCode(
+    jsCode: String,
+    implementationClass: String
+): T {
     eval(jsCode)
 
-    val extension: ValueType = getExtension()
-    val moduleConstructor: ValueType = extension.dot(implementationClass)
-    val moduleInstance: T = new(moduleConstructor)
-
-    return moduleInstance
+    val extensionKey: String = getWindowKeys().last()
+    try {
+        val extension: ValueType = getOnWindow(getWindowKeys().last())
+        val moduleConstructor: ValueType = extension.dot(implementationClass)
+        return new(moduleConstructor)
+    }
+    catch (e: Throwable) {
+        throw RuntimeException("Loading exception using key '$extensionKey' failed", e)
+    }
 }
 
 internal expect fun <T: ValueType> new(constructor: ValueType): T
 
-internal expect fun getExtension(): ValueType
+internal expect fun getOnWindow(key: String): ValueType
+
+internal expect fun getWindowKeys(): List<String>
 
 internal expect fun entriesOf(jsObject: ValueType): List<Pair<String, ValueType?>>
 

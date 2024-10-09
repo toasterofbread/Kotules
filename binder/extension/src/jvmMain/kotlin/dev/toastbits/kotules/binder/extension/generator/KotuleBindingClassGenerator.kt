@@ -2,6 +2,7 @@ package dev.toastbits.kotules.binder.extension.generator
 
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
@@ -27,6 +28,7 @@ import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.runtime.util.appendParameters
 import dev.toastbits.kotules.binder.core.util.getNeededFunctions
+import dev.toastbits.kotules.binder.core.util.getNeededProperties
 import dev.toastbits.kotules.binder.core.util.isListType
 import dev.toastbits.kotules.binder.core.util.isPrimitiveType
 import dev.toastbits.kotules.binder.core.util.resolveTypeAlias
@@ -46,7 +48,7 @@ private val FileGenerator.Scope.OutValue: String
         return outValueName
     }
 
-fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimitive: Boolean = false, isInput: Boolean = false): Pair<TypeName, String?> {
+fun FileGenerator.Scope.getInteropTypeAndTransformFor(type: KSType, canBePrimitive: Boolean = false, isInput: Boolean = false): Pair<TypeName, String?> {
     val isPrimitive: Boolean = type.isPrimitiveType()
     val isListType: Boolean = isPrimitive && type.isListType()
 
@@ -59,7 +61,19 @@ fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimi
                 OutValueContainer::class.asClassName()
                     .plusParameter(WildcardTypeName.producerOf(Any::class.asTypeName().copy(nullable = true)))
 
-            return outputType to OutValue
+            val transform: String =
+                if (isListType) {
+                    val itemTransform: String? =
+                        getInteropTypeAndTransformFor(
+                            type.arguments.single().type!!.resolve().resolveTypeAlias(),
+                            canBePrimitive = true,
+                            isInput = true
+                        ).second
+                    ".let { $OutValue(it.map { it${itemTransform ?: ""} }) }"
+                }
+                else ".let { $OutValue(it) }"
+
+            return outputType to transform
         }
 
         if (isInput) {
@@ -68,22 +82,33 @@ fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimi
             val inputType: ClassName =
                 generateNew(resolveInPackage(inputBindingName)) {
                     file.addType(
+//                        KotuleBindingClassGenerator
 //                        KotuleB(this).generate(inputBindingName, type.declaration as KSClassDeclaration, force = true)!!
                         TypeSpec.interfaceBuilder(inputBindingName)
                             .apply {
-                                addAnnotation(ClassName("kotlin.js", "JsExport"))
-//                                val dec = type.declaration as KSClassDeclaration
-                                addFunction(
-                                    FunSpec.builder("getText")
-                                        .returns(String::class)
-                                        .addModifiers(KModifier.ABSTRACT)
-                                        .addAnnotation(
-                                            AnnotationSpec.builder(ClassName("kotlin.js", "JsName"))
-                                                .addMember("name = \"getText\"")
-                                                .build()
-                                        )
-                                        .build()
-                                )
+                                addAnnotation(PlatformJsExport::class)
+
+                                val declaration: KSClassDeclaration = type.declaration as KSClassDeclaration
+                                for (function in declaration.getNeededFunctions()) {
+                                    addFunction(
+                                        FunSpec.builder(function.simpleName.asString())
+                                            .returns(function.returnType?.resolve()?.let { getInteropTypeAndTransformFor(it, canBePrimitive = true).first } ?: Unit::class.asTypeName())
+                                            .addModifiers(KModifier.ABSTRACT)
+//                                            .addAnnotation(
+//                                                AnnotationSpec.builder(ClassName("kotlin.js", "JsName"))
+//                                                    .addMember("name = \"getText\"")
+//                                                    .build()
+//                                            )
+                                            .build()
+                                    )
+                                }
+                                for (property in declaration.getNeededProperties()) {
+                                    addProperty(
+                                        PropertySpec.builder(property.simpleName.asString(), property.type.toTypeName())
+                                            .addModifiers(KModifier.ABSTRACT)
+                                            .build()
+                                    )
+                                }
                             }
                             .build()
                     )
@@ -111,7 +136,10 @@ fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimi
                 )
             }
 
-            return inputType to inputBindingName
+            return inputType to ".let { $inputBindingName(it) }"
+        }
+        else if ((type.declaration as KSClassDeclaration).classKind == ClassKind.ENUM_CLASS) {
+            return type.toTypeName() to ".let { ${type.toClassName().simpleName}.entries[it] }"
         }
         else {
             val outputBindingName: String = KotuleExtensionBinderConstants.getOutputBindingName(type.toClassName().simpleName)
@@ -120,7 +148,7 @@ fun FileGenerator.Scope.getInteropTypeAndConstructorFor(type: KSType, canBePrimi
                     file.addType(KotuleBindingClassGenerator(this).generate(outputBindingName, type.declaration as KSClassDeclaration)!!)
                 }
 
-            return outputType to outputBindingName
+            return outputType to ".let { $outputBindingName(it) }"
         }
     }
 }
@@ -137,6 +165,12 @@ internal class KotuleBindingClassGenerator(
     ): TypeSpec? =
         if (scope.target != KmpTarget.COMMON) null
         else TypeSpec.classBuilder(name).apply {
+            when (kotuleClass.classKind) {
+                ClassKind.OBJECT -> return@apply
+                ClassKind.ENUM_CLASS -> throw IllegalStateException(kotuleClass.toString())
+                else -> {}
+            }
+
             val primaryConstructor: KSFunctionDeclaration? = kotuleClass.primaryConstructor
 
             if (primaryConstructor != null) {
@@ -159,21 +193,21 @@ internal class KotuleBindingClassGenerator(
                     throw RuntimeException("$name $kotuleClass", e)
                 }
 
-            if (kotuleClass.isAbstract()) {
-                addModifiers(KModifier.ABSTRACT)
-            }
-            else {
+//            if (kotuleClass.isAbstract()) { && false
+//                addModifiers(KModifier.ABSTRACT)
+//            }
+//            else {
                 addProperty(
                     PropertySpec.builder(instanceName, instanceType)
                         .addModifiers(KModifier.PRIVATE)
                         .initializer(buildString {
-                            append("${kotuleClass.simpleName.asString()}(")
+                            append("${kotuleClass.qualifiedName!!.asString().removePrefix(kotuleClass.packageName.asString() + ".")}(")
                             appendParameters(primaryConstructor?.parameters.orEmpty())
                             append(')')
                         })
                         .build()
                 )
-            }
+//            }
 
             addAnnotation(PlatformJsExport::class)
 
@@ -185,18 +219,18 @@ internal class KotuleBindingClassGenerator(
 
             addProperties(
                 kotuleClass.getAllProperties().associate { it.simpleName.asString() to it.type.resolve().resolveTypeAlias() },
-                kotuleClass.isAbstract()
+                kotuleClass.isAbstract() && false
             )
 
             addFunctions(
                 kotuleClass.getNeededFunctions(),
-                kotuleClass.isAbstract()
+                kotuleClass.isAbstract() && false
             )
         }.build()
 
     private fun TypeSpec.Builder.addProperties(properties: Map<String, KSType>, isAbstract: Boolean) {
         for ((propertyName, propertyType) in properties) {
-            val (outPropertyType: TypeName, outPropertyTypeConstructor: String?) = scope.getInteropTypeAndConstructorFor(propertyType)
+            val (outPropertyType: TypeName, outPropertyTypeConstructor: String?) = scope.getInteropTypeAndTransformFor(propertyType, canBePrimitive = true)
             val isPrimitive: Boolean = propertyType.isPrimitiveType()
 
             addProperty(
@@ -214,13 +248,11 @@ internal class KotuleBindingClassGenerator(
                                         append("return ")
                                         append("$instanceName.$propertyName")
 
-                                        if (outPropertyTypeConstructor != null) {
-                                            temp(
-                                                propertyType,
-                                                outPropertyTypeConstructor,
-                                                isPrimitive
-                                            )
-                                        }
+                                        temp(
+                                            propertyType,
+                                            outPropertyTypeConstructor,
+                                            isPrimitive
+                                        )
                                     }
                                 )
                                 .build()
@@ -233,25 +265,45 @@ internal class KotuleBindingClassGenerator(
 
     private fun StringBuilder.temp(
         propertyType: KSType,
-        outPropertyTypeConstructor: String?,
+        outPropertyTypeTransform: String?,
         isPrimitive: Boolean
     ) {
-        if (propertyType.isMarkedNullable) {
-            append('?')
-        }
-        append(".let {\n$outPropertyTypeConstructor(")
-
-        if (isPrimitive) {
-            append("it")
-
-            if (propertyType.isListType()) {
-                appendListMapSuffix(propertyType)
+        if (propertyType.declaration.modifiers.contains(Modifier.SEALED)) {
+            if (propertyType.isMarkedNullable) {
+                append('?')
             }
+
+            appendLine(".let {")
+            appendLine("    when (it) {")
+            for (subclass in (propertyType.declaration as KSClassDeclaration).getSealedSubclasses()) {
+                val location: String = subclass.qualifiedName!!.asString().removePrefix(subclass.packageName.asString() + '.')
+                append("        is $location -> ")
+
+                val subclassType: KSType = subclass.asType(emptyList())
+                val (_: TypeName, subclassConstructor: String?) = scope.getInteropTypeAndTransformFor(subclassType)
+                checkNotNull(subclassConstructor) { subclass }
+
+                append(subclassConstructor)
+                append('(')
+
+                if (subclassType.isPrimitiveType() || (subclassType.declaration as KSClassDeclaration).isAbstract()) {
+                    append("it")
+                }
+                else {
+                    appendParameters((subclassType.declaration as KSClassDeclaration).primaryConstructor!! .parameters) { "it.$it" }
+                }
+
+                appendLine(')')
+            }
+            appendLine("    }")
+            append("}")
         }
-        else {
-            appendParameters((propertyType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+        else if (outPropertyTypeTransform != null) {
+            if (propertyType.isMarkedNullable) {
+                append('?')
+            }
+            append(outPropertyTypeTransform)
         }
-        append(")\n}")
     }
 
     private fun StringBuilder.appendListMapSuffix(propertyType: KSType) {
@@ -259,21 +311,28 @@ internal class KotuleBindingClassGenerator(
         val listItemIsPrimitive: Boolean =
             listItemType.isPrimitiveType()
 
-        append(".map { ")
-        if (listItemIsPrimitive) {
-            append("${scope.OutValue}(it)")
-        }
-        else {
-            append(KotuleExtensionBinderConstants.getOutputBindingName(listItemType.toClassName().simpleName))
-            append('(')
-            try {
-                appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
-            }
-            catch (e: Throwable) {
-                throw RuntimeException(listItemType.toString(), e)
-            }
-            append(')')
-        }
+        append(".map { it")
+
+        val (_: TypeName, transform: String?) = scope.getInteropTypeAndTransformFor(listItemType)
+        temp(listItemType, transform, listItemIsPrimitive)
+
+//        if (listItemIsPrimitive) {
+//            append("${scope.OutValue}(it)")
+//        }
+//        else {
+//            val outputBinding: ClassName = scope.generateClassBindings(listItemType.declaration as KSClassDeclaration)
+//            scope.import(outputBinding)
+//            append(outputBinding.simpleName)
+//            append('(')
+//            try {
+//                append("it")
+////                appendParameters((listItemType.declaration as KSClassDeclaration).primaryConstructor!!.parameters) { "it.$it" }
+//            }
+//            catch (e: Throwable) {
+//                throw RuntimeException(listItemType.toString(), e)
+//            }
+//            append(')')
+//        }
         append(" }")
     }
 
@@ -299,7 +358,7 @@ internal class KotuleBindingClassGenerator(
         for (parameter in parameters) {
             addParameter(
                 parameter.name!!.asString(),
-                scope.getInteropTypeAndConstructorFor(
+                scope.getInteropTypeAndTransformFor(
                     parameter.type.resolve(),
                     canBePrimitive = true,
                     isInput = true
@@ -322,17 +381,18 @@ internal class KotuleBindingClassGenerator(
 //                )
 
                 function.returnType?.also { returnType ->
-                    returns(scope.getInteropTypeAndConstructorFor(returnType.resolve(), true).first)
+                    returns(scope.getInteropTypeAndTransformFor(returnType.resolve(), true).first)
                 }
 
                 addInteropParameters(function.parameters)
 
-                if (!function.isAbstract && !isAbstract) {
+                if (!isAbstract) {
                     addCode(
                         buildString {
-                            append("return $instanceName.${function.simpleName.asString()}(")
-                            addFunctionCallArgs(function.parameters)
-                            append(')')
+                            append("return TODO(\"4\")")
+//                            append("return $instanceName.${function.simpleName.asString()}(")
+//                            addFunctionCallArgs(function.parameters)
+//                            append(')')
                         }
                     )
                 }

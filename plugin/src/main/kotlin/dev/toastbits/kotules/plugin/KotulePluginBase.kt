@@ -8,7 +8,7 @@ import org.gradle.api.UnknownDomainObjectException
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
-abstract class KotulePluginBase: Plugin<Project> {
+abstract class KotulePluginBase(val a: Boolean = true): Plugin<Project> {
     protected val kotulesVersion: String get() = "0.0.1" // TODO
 
     override fun apply(project: Project) {
@@ -18,7 +18,7 @@ abstract class KotulePluginBase: Plugin<Project> {
         }
 
         project.tasks.withType(KotlinCompilationTask::class.java) { task ->
-            if (task.name != "kspCommonMainKotlinMetadata") {
+            if (a && task.name != "kspCommonMainKotlinMetadata") {
                 task.dependsOn("kspCommonMainKotlinMetadata")
             }
         }

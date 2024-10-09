@@ -12,7 +12,10 @@ import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
+import com.squareup.kotlinpoet.TypeVariableName
+import com.squareup.kotlinpoet.WildcardTypeName
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toClassName
 import dev.toastbits.kotules.binder.core.generator.FileGenerator
@@ -20,6 +23,7 @@ import dev.toastbits.kotules.binder.runtime.generator.KotuleBindingInterfaceGene
 import dev.toastbits.kotules.binder.runtime.generator.KotuleLoaderGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.binder.core.util.KotuleCoreBinderConstants
+import dev.toastbits.kotules.binder.runtime.generator.TypeArgumentInfo
 import dev.toastbits.kotules.binder.runtime.util.KotuleRuntimeBinderConstants
 import dev.toastbits.kotules.core.Kotule
 import dev.toastbits.kotules.runtime.KotuleLoader
@@ -72,7 +76,7 @@ internal class KotuleRuntimeAnnotationProcessor(
                 ),
                 target
             ) {
-                interfaceGenerator.generate(bindingName, kotuleInterface, false)?.also {
+                interfaceGenerator.generate(bindingName, kotuleInterface, false, TypeArgumentInfo())?.also {
                     file.addType(it)
                 }
             }
@@ -83,7 +87,7 @@ internal class KotuleRuntimeAnnotationProcessor(
                 ),
                 target
             ) {
-                file.addType(loaderGenerator.generate(loaderName, kotuleInterface))
+                file.addType(loaderGenerator.generate(loaderName, kotuleInterface, TypeArgumentInfo()))
             }
         }
     }

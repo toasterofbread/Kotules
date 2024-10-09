@@ -22,6 +22,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.WildcardTypeName
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
@@ -62,7 +63,7 @@ data class TypeArgumentInfo(
         args.getOrNull(parameters.indexOf(param))
 
     fun find(param: KSTypeParameter): KSTypeReference =
-        findOrNull(param) ?: throw NullPointerException(param.toString())
+        findOrNull(param) ?: throw NullPointerException("$param | $args | $parameters")
 
     fun withBounds(): TypeArgumentInfo =
         copy(args = parameters.map { it.bounds.single() })
@@ -79,16 +80,16 @@ data class TypeArgumentInfo(
 private fun FileGenerator.Scope.getOutputInteropTypeFor(type: KSType, arguments: TypeArgumentInfo, canBePrimitive: Boolean = false): TypeName {
     val resolvedType: KSType = type.resolveTypeAlias()
 
-    if (canBePrimitive && resolvedType.isPrimitiveType() && !resolvedType.isListType()) {
-        return type.toTypeName()
-    }
-
-    resolvedType.getBuiltInInputWrapperClass(this)?.also { return it }
-
     val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
     if (qualifiedName.startsWith("kotlin.Function")) {
         return getFunctionInteropType(resolvedType, arguments)
     }
+
+    if (canBePrimitive && resolvedType.isPrimitiveType() && !resolvedType.isListType()) {
+        return type.toTypeName()
+    }
+
+    resolvedType.getBuiltInInputWrapperClass(this, arguments)?.also { return it }
 
     val declaration: KSDeclaration = resolvedType.declaration
 
@@ -147,7 +148,7 @@ internal class KotuleBindingInterfaceGenerator(
         name: String,
         kotuleInterface: KSClassDeclaration,
         mutableFunctions: Boolean,
-        arguments: TypeArgumentInfo = TypeArgumentInfo()
+        arguments: TypeArgumentInfo
     ): TypeSpec? =
         if (scope.target != KmpTarget.COMMON && !scope.target.isWeb()) null
         else TypeSpec.interfaceBuilder(name).apply {
@@ -237,7 +238,7 @@ internal class KotuleBindingInterfaceGenerator(
                     .run {
                         if (kotuleInterface.typeParameters.isNotEmpty())
                             parameterizedBy(kotuleInterface.typeParameters.map {
-                                it.bounds.single().toTypeName()
+                                WildcardTypeName.producerOf(it.bounds.single().toTypeName())
                             })
                         else this
                     }
@@ -259,6 +260,7 @@ internal class KotuleBindingInterfaceGenerator(
                                         .resolveTypeAlias()
                                 },
                                 function.returnType?.resolve(arguments)?.resolveTypeAlias(),
+                                arguments,
                                 addArgumentTypes = false
                             )
                         appendLine("$instanceParamName::$functionName$valueSuffix,")
@@ -268,7 +270,8 @@ internal class KotuleBindingInterfaceGenerator(
                         val propertyName: String = property.simpleName.asString()
                         val valueSuffix: String = getFunctionParameterTransformSuffix(
                             property.type.resolve(arguments.withBounds()),
-                            true
+                            true,
+                            arguments
                         )
                         appendLine("$instanceParamName.$propertyName$valueSuffix,")
                     }
@@ -299,15 +302,15 @@ internal class KotuleBindingInterfaceGenerator(
                         nullable = returnType.isMarkedNullable
                     ),
                     parameters =
-                    function.parameters.map {
-                        ParameterSpec.unnamed(
-                            getOutputInteropTypeFor(
-                                it.type.resolve(),
-                                arguments.withBounds(),
-                                true
+                        function.parameters.map {
+                            ParameterSpec.unnamed(
+                                getOutputInteropTypeFor(
+                                    it.type.resolve(),
+                                    arguments.withBounds(),
+                                    true
+                                )
                             )
-                        )
-                    }
+                        }
                 )
 
             addParameter("$argPrefix${arg++}", type)

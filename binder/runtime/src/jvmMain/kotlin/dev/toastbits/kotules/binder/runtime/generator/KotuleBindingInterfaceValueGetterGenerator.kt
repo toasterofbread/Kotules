@@ -73,7 +73,7 @@ class KotuleBindingInterfaceValueGetterGenerator(
                                     kotuleInterface.toClassName().run { canonicalName.removePrefix(packageName + ".") }
 
                                 if (kotuleInterface.isAbstract()) {
-                                    append(scope.getMapper(kotuleInterface).simpleName)
+                                    append(scope.getMapper(kotuleInterface, arguments).simpleName)
                                     append("(this)")
                                 }
                                 else if (kotuleInterface.classKind == ClassKind.ENUM_CLASS) {
@@ -106,7 +106,18 @@ class KotuleBindingInterfaceValueGetterGenerator(
                                                 if (type.isMarkedNullable) {
                                                     append('?')
                                                 }
-                                                append(".getListValue().map { it.${generateGetter(actualType.arguments.single().type!!.resolve())} }")
+
+                                                append(".getListValue().map { it")
+
+                                                val argType = actualType.arguments.single().type!!.resolve()
+                                                if (argType.isPrimitiveType()) {
+                                                    append(".value")
+                                                }
+                                                else {
+                                                    append(".${generateGetter(actualType.arguments.single().type!!.resolve())}")
+                                                }
+
+                                                append(" }")
 
                                                 when (listType) {
                                                     ListType.LIST -> {}

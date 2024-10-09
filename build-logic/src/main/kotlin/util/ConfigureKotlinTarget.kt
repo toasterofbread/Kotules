@@ -71,14 +71,14 @@ fun KotlinMultiplatformExtension.configureKmpTargets(
             KmpTarget.WASMJS -> {
                 wasmJs {
                     beforeConfigure()
-                    configureWasmOrJs()
+                    configureWebTarget()
                     afterConfigure()
                 }
             }
             KmpTarget.JS -> {
                 js(IR) {
                     beforeConfigure()
-                    configureWasmOrJs()
+                    configureWebTarget()
                     afterConfigure()
                 }
             }
@@ -158,7 +158,7 @@ fun KotlinMultiplatformExtension.configureKmpTargets(
     }
 }
 
-fun KotlinJsTargetDsl.configureWasmOrJs() {
+fun KotlinJsTargetDsl.configureWebTarget() {
     moduleName = project.getCurrentPackage()
     useCommonJs()
     browser {

@@ -31,7 +31,7 @@ class KotuleSealedClassMapperGenerator(
                 )
             addParameter(instanceName, inputClassName)
 
-            addCode("return TODO()")
+            addCode("return TODO(\"1\")")
         }
         .build()
 }

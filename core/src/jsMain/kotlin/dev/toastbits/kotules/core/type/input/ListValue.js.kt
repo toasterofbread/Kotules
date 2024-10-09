@@ -20,5 +20,12 @@ actual fun <T : ValueType?> createListValue(items: List<T>): ListValue<T> =
         items.asJsReadonlyArrayView()
     )
 
-actual fun <T: ValueType?> ListValue<T>.getListValue(): List<T> =
-    arrayValue.toList()
+actual fun <T: ValueType?> ListValue<T>.getListValue(): List<T> {
+    println("getListValue 1")
+    println("getListValue 2 $this")
+    println("getListValue 3 ${this::class}")
+    println("getListValue 4 $arrayValue")
+    println("getListValue 5 ${arrayValue::class}")
+    println("getListValue 6 ${arrayValue.toList()}")
+    return arrayValue.toList()
+}

@@ -17,6 +17,23 @@ import dev.toastbits.kotules.binder.core.generator.FileGenerator
 import dev.toastbits.kotules.binder.runtime.util.KmpTarget
 import dev.toastbits.kotules.extension.annotation.KotuleDefinition
 
+fun FileGenerator.Scope.generateClassBindings(kotuleClass: KSClassDeclaration): ClassName {
+    val packageName: String = kotuleClass.packageName.asString()
+    val bindingClassName: String = KotuleExtensionBinderConstants.getOutputBindingName(kotuleClass)
+
+    lateinit var ret: ClassName
+
+    for (target in KmpTarget.entries) {
+        ret = generateNew(ClassName(packageName, bindingClassName), target) {
+            KotuleBindingClassGenerator(this).generate(bindingClassName, kotuleClass)?.also {
+                file.addType(it)
+            }
+        }
+    }
+
+    return ret
+}
+
 internal class KotuleExtensionAnnotationProcessor(
     environment: SymbolProcessorEnvironment
 ): SymbolProcessor {
@@ -30,7 +47,17 @@ internal class KotuleExtensionAnnotationProcessor(
 
         for (kotuleClass in kotuleClasses) {
             validateKotuleClass(kotuleClass)
-            generateClassBindings(kotuleClass)
+
+            val packageName: String = kotuleClass.packageName.asString()
+            val bindingClassName: String = KotuleExtensionBinderConstants.getOutputBindingName(kotuleClass)
+
+            for (target in KmpTarget.entries) {
+                fileGenerator.generate(ClassName(packageName, bindingClassName), target) {
+                    KotuleBindingClassGenerator(this).generate(bindingClassName, kotuleClass)?.also {
+                        file.addType(it)
+                    }
+                }
+            }
         }
 
         fileGenerator.writeToDisk()
@@ -38,18 +65,6 @@ internal class KotuleExtensionAnnotationProcessor(
         return emptyList()
     }
 
-    private fun generateClassBindings(kotuleClass: KSClassDeclaration) {
-        val packageName: String = kotuleClass.packageName.asString()
-        val bindingClassName: String = KotuleExtensionBinderConstants.getOutputBindingName(kotuleClass)
-
-        for (target in KmpTarget.entries) {
-            fileGenerator.generate(ClassName(packageName, bindingClassName), target) {
-                KotuleBindingClassGenerator(this).generate(bindingClassName, kotuleClass)?.also {
-                    file.addType(it)
-                }
-            }
-        }
-    }
 
     private fun validateKotuleClass(kotuleClass: KSClassDeclaration) {
         if (kotuleClass.modifiers.contains(Modifier.ABSTRACT)) {

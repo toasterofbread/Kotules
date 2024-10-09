@@ -4,7 +4,11 @@ import dev.toastbits.kotules.core.type.ValueType
 
 internal actual fun <T: ValueType> new(constructor: ValueType): T = js("new constructor()")
 
-internal actual fun getExtension(): ValueType = js("extension")
+internal actual fun getOnWindow(key: String): ValueType = js("window[key]")
+
+private fun getWindowKeysArray(): JsArray<JsString> = js("Object.keys(window)")
+
+internal actual fun getWindowKeys(): List<String> = getWindowKeysArray().map { it.toString() }
 
 private val getObjectEntries: (JsAny) -> JsArray<JsArray<JsAny?>> = js("Object.entries")
 

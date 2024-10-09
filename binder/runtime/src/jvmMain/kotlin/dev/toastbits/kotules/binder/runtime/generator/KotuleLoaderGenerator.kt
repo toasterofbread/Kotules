@@ -18,7 +18,8 @@ internal class KotuleLoaderGenerator(
 ) {
     fun generate(
         name: String,
-        kotuleInterface: KSClassDeclaration
+        kotuleInterface: KSClassDeclaration,
+        arguments: TypeArgumentInfo
     ): TypeSpec =
         TypeSpec.objectBuilder(name)
             .apply {
@@ -32,12 +33,13 @@ internal class KotuleLoaderGenerator(
                 }
 
                 addSuperinterface(KotuleLoader::class.asTypeName().plusParameter(kotuleInterface.toClassName()))
-                generateBody(kotuleInterface)
+                generateBody(kotuleInterface, arguments)
             }
             .build()
 
     private fun TypeSpec.Builder.generateBody(
-        kotuleInterface: KSClassDeclaration
+        kotuleInterface: KSClassDeclaration,
+        arguments: TypeArgumentInfo
     ) {
         when (scope.target) {
             KmpTarget.COMMON -> {}
@@ -88,7 +90,7 @@ internal class KotuleLoaderGenerator(
                             )
                         )
                         .addCode(buildString {
-                            val mapperClass: ClassName = scope.getMapper(kotuleInterface)
+                            val mapperClass: ClassName = scope.getMapper(kotuleInterface, arguments)
                             scope.import("dev.toastbits.kotules.runtime", "loadKotuleInputBindingFromKotlinJsCode")
 
                             append("return ${mapperClass.simpleName}(loadKotuleInputBindingFromKotlinJsCode(jsCode, implementationClass))")

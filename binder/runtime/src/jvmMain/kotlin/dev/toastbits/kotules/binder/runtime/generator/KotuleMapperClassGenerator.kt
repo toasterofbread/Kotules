@@ -33,7 +33,7 @@ import dev.toastbits.kotules.core.util.ListType
 import dev.toastbits.kotules.extension.KotulePromise
 import dev.toastbits.kotules.extension.await
 
-fun FileGenerator.Scope.getMapper(kotuleInterface: KSClassDeclaration): ClassName {
+fun FileGenerator.Scope.getMapper(kotuleInterface: KSClassDeclaration, arguments: TypeArgumentInfo): ClassName {
     val mapperName: ClassName = resolveInPackage(KotuleCoreBinderConstants.getInputMapperName(kotuleInterface))
     return generateNew(mapperName) {
         if (kotuleInterface.modifiers.contains(Modifier.SEALED)) {
@@ -42,7 +42,7 @@ fun FileGenerator.Scope.getMapper(kotuleInterface: KSClassDeclaration): ClassNam
             }
         }
         else {
-            KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface)?.also {
+            KotuleMapperClassGenerator(this).generate(mapperName.simpleName, kotuleInterface, arguments)?.also {
                 this@generateNew.file.addType(it)
             }
         }
@@ -56,7 +56,8 @@ class KotuleMapperClassGenerator(
 
     fun generate(
         name: String,
-        kotuleInterface: KSClassDeclaration
+        kotuleInterface: KSClassDeclaration,
+        arguments: TypeArgumentInfo
     ): TypeSpec? =
         if (scope.target == KmpTarget.COMMON || scope.target == KmpTarget.JVM) null
         else TypeSpec.classBuilder(name).apply {
@@ -91,11 +92,11 @@ class KotuleMapperClassGenerator(
                 superclass(kotuleInterface.toClassName())
             }
 
-            addProperties(kotuleInterface.getNeededProperties())
-            addFunctions(kotuleInterface.getNeededFunctions())
+            addProperties(kotuleInterface.getNeededProperties(), arguments)
+            addFunctions(kotuleInterface.getNeededFunctions(), arguments)
         }.build()
 
-    private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>) {
+    private fun TypeSpec.Builder.addProperties(properties: Sequence<KSPropertyDeclaration>, arguments: TypeArgumentInfo) {
         for (property in properties) {
             addProperty(
                 PropertySpec.Companion.builder(
@@ -108,7 +109,7 @@ class KotuleMapperClassGenerator(
                                 FunSpec.getterBuilder()
                                     .addCode(buildString {
                                         append("return $instanceName.${property.simpleName.asString()}")
-                                        append(scope.getPropertyOrFunctionValueTransformSuffix(property.type.resolve(), true))
+                                        append(scope.getPropertyOrFunctionValueTransformSuffix(property.type.resolve(), true, arguments))
                                     })
                                     .build()
                             )
@@ -131,22 +132,22 @@ class KotuleMapperClassGenerator(
         }
     }
 
-    private fun TypeSpec.Builder.addFunctions(functions: Sequence<KSFunctionDeclaration>) {
+    private fun TypeSpec.Builder.addFunctions(functions: Sequence<KSFunctionDeclaration>, arguments: TypeArgumentInfo) {
         for (function in functions) {
             if (function.isConstructor()) {
                 continue
             }
 
             if (function.modifiers.contains(Modifier.SUSPEND)) {
-                addFunction(generateSuspendFunction(function))
+                addFunction(generateSuspendFunction(function, arguments))
             }
             else {
-                addFunction(generateNonSuspendFunction(function))
+                addFunction(generateNonSuspendFunction(function, arguments))
             }
         }
     }
 
-    private fun generateNonSuspendFunction(function: KSFunctionDeclaration): FunSpec =
+    private fun generateNonSuspendFunction(function: KSFunctionDeclaration, arguments: TypeArgumentInfo): FunSpec =
         FunSpec.builder(function.simpleName.asString())
             .apply {
                 val returnType: KSTypeReference? = function.returnType
@@ -168,7 +169,7 @@ class KotuleMapperClassGenerator(
 
                 addCode(
                     buildString {
-                        appendFunctionCallReturn(function, returnType, true)
+                        appendFunctionCallReturn(function, returnType, true, arguments)
                     }
                 )
             }
@@ -178,11 +179,12 @@ class KotuleMapperClassGenerator(
         function: KSFunctionDeclaration,
         returnType: KSTypeReference?,
         canBePrimitive: Boolean,
+        arguments: TypeArgumentInfo,
         resultTransform: String = ""
     ) {
         val paramTransforms: List<String?> =
             function.parameters.map { param ->
-                scope.getFunctionParameterTransformSuffix(param.type.resolve(), true).ifBlank { null }
+                scope.getFunctionParameterTransformSuffix(param.type.resolve(), true, arguments).ifBlank { null }
             }
 
         val paramNamePrefix: String = "_parameter"
@@ -213,11 +215,11 @@ class KotuleMapperClassGenerator(
         append(resultTransform)
 
         if (returnType != null) {
-            append(scope.getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), canBePrimitive))
+            append(scope.getPropertyOrFunctionValueTransformSuffix(returnType.resolve(), canBePrimitive, arguments))
         }
     }
     
-    private fun generateSuspendFunction(function: KSFunctionDeclaration): FunSpec =
+    private fun generateSuspendFunction(function: KSFunctionDeclaration, arguments: TypeArgumentInfo): FunSpec =
         FunSpec.builder(function.simpleName.asString())
             .apply {
                 val returnType: KSTypeReference? = function.returnType
@@ -239,7 +241,7 @@ class KotuleMapperClassGenerator(
                         val awaitPackage: String = KotulePromise::class.java.packageName
                         scope.import(awaitPackage, awaitName)
 
-                        appendFunctionCallReturn(function, returnType, false, resultTransform = ".await()")
+                        appendFunctionCallReturn(function, returnType, false, arguments, resultTransform = ".await()")
                     }
                 )
             }
@@ -249,7 +251,9 @@ class KotuleMapperClassGenerator(
 fun FileGenerator.Scope.getFunctionParameterTransformSuffix(
     parameters: List<KSType>,
     returnType: KSType?,
-    addArgumentTypes: Boolean = true
+    arguments: TypeArgumentInfo,
+    addArgumentTypes: Boolean = true,
+    reverse: Boolean = false
 ): String = buildString {
     val functionName: String = "lambda"
     val argumentPrefix: String = "arg"
@@ -260,7 +264,7 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(
         for ((index, param) in parameters.withIndex()) {
             append("$argumentPrefix$index")
 
-            if (addArgumentTypes) {
+            if (addArgumentTypes && !reverse) {
                 append(": ")
                 if (param.isPrimitiveType()) {
                     append(param.toClassName().canonicalName)
@@ -281,7 +285,13 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(
     append('(')
     for ((index, param) in parameters.withIndex()) {
         append("$argumentPrefix$index")
-        append(getPropertyOrFunctionValueTransformSuffix(param, true))
+
+        if (reverse) {
+            append(getFunctionParameterTransformSuffix(param, true, arguments))
+        }
+        else {
+            append(getPropertyOrFunctionValueTransformSuffix(param, true, arguments))
+        }
 
         if (index + 1 != parameters.size) {
             append(", ")
@@ -290,14 +300,26 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(
     append(')')
 
     if (returnType != null) {
-        append(getFunctionParameterTransformSuffix(returnType, true))
+        if (reverse) {
+            append(getPropertyOrFunctionValueTransformSuffix(returnType, true, arguments))
+        }
+        else {
+            append(getFunctionParameterTransformSuffix(returnType, true, arguments))
+        }
     }
 
     append(" } }")
 }
 
-fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
+fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBePrimitive: Boolean, arguments: TypeArgumentInfo): String = buildString {
     val resolvedType: KSType = type.resolveTypeAlias()
+
+    val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
+    if (qualifiedName.startsWith("kotlin.Function")) {
+        val args: List<KSType> = resolvedType.arguments.map { it.type!!.resolve().resolveTypeAlias() }
+        append(getFunctionParameterTransformSuffix(args.dropLast(1), args.last(), arguments))
+        return@buildString
+    }
 
     if (resolvedType.isPrimitiveType()) {
         if (resolvedType.isListType()) {
@@ -305,7 +327,7 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBeP
             appendLine("${resolvedType.safeAccessPrefix}.let {")
             appendLine("    createListValue(")
             appendLine("        it.map {")
-            appendLine("            it${getFunctionParameterTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false)}")
+            appendLine("            it${getFunctionParameterTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false, arguments)}")
             append("        }")
             if (!resolvedType.isListType(true)) {
                 append(".toList()")
@@ -313,7 +335,7 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBeP
             append("\n    )\n}")
         }
         else if (!canBePrimitive) {
-            val wrapper: TypeName = resolvedType.getBuiltInInputWrapperClass(this@getFunctionParameterTransformSuffix)!!
+            val wrapper: TypeName = resolvedType.getBuiltInInputWrapperClass(this@getFunctionParameterTransformSuffix, arguments)!!
             append("${resolvedType.safeAccessPrefix}.let { $wrapper(it) }")
         }
 
@@ -326,18 +348,12 @@ fun FileGenerator.Scope.getFunctionParameterTransformSuffix(type: KSType, canBeP
         return@buildString
     }
 
-    val qualifiedName: String = resolvedType.declaration.qualifiedName!!.asString()
-    if (qualifiedName.startsWith("kotlin.Function")) {
-        val args: List<KSType> = resolvedType.arguments.map { it.type!!.resolve().resolveTypeAlias() }
-        getFunctionParameterTransformSuffix(args.dropLast(1), args.last())
-    }
-
     val typeDeclaration: KSClassDeclaration = resolvedType.declaration as KSClassDeclaration
-    val binding: ClassName = getInputBinding(typeDeclaration, TypeArgumentInfo())
+    val binding: ClassName = getInputBinding(typeDeclaration, TypeArgumentInfo.from(resolvedType.arguments, typeDeclaration.typeParameters))
     appendLine("${resolvedType.safeAccessPrefix}.let { ${binding.simpleName}(it) }")
 }
 
-private fun FileGenerator.Scope.getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean): String = buildString {
+private fun FileGenerator.Scope.getPropertyOrFunctionValueTransformSuffix(type: KSType, canBePrimitive: Boolean, arguments: TypeArgumentInfo): String = buildString {
     val resolvedType: KSType = type.resolveTypeAlias()
 
     resolvedType.declaration.getTypeWrapper()?.also { typeWrapper ->
@@ -348,7 +364,7 @@ private fun FileGenerator.Scope.getPropertyOrFunctionValueTransformSuffix(type: 
 
     val listType: ListType? = resolvedType.getListType()
     if (listType != null) {
-        val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false)
+        val valueSuffix: String = getPropertyOrFunctionValueTransformSuffix(resolvedType.arguments.single().type!!.resolve(), false, arguments)
         import("dev.toastbits.kotules.core.type.input", "getListValue")
         append(resolvedType.safeAccessPrefix)
         append(".getListValue().map { it$valueSuffix }")
@@ -368,6 +384,13 @@ private fun FileGenerator.Scope.getPropertyOrFunctionValueTransformSuffix(type: 
     }
     else if (!canBePrimitive) {
         append(".value")
+    }
+    else {
+        val qualifiedName: String = resolvedType.toClassName().canonicalName
+        if (qualifiedName.startsWith("kotlin.Function")) {
+            val argumentTypes: List<KSType> = resolvedType.arguments.map { it.type!!.resolve().resolveTypeAlias() }
+            append(getFunctionParameterTransformSuffix(argumentTypes.dropLast(1), argumentTypes.last(), arguments, reverse = true))
+        }
     }
 }
 
